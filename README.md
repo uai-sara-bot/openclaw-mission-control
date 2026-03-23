@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenClaw Mission Control
 
-## Getting Started
+A custom operations dashboard for [OpenClaw](https://github.com/openclaw) AI agent orchestration. Monitor, manage, and coordinate your fleet of 13+ AI agents from a single dark-themed control panel.
 
-First, run the development server:
+Built with Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, Supabase, and Recharts.
+
+<!-- TODO: Add screenshot -->
+![Dashboard Screenshot](docs/assets/screenshot-placeholder.png)
+
+## Features
+
+- **Agent Overview** — Real-time status cards for all 13 agents (Opus, Sonnet, GPT-5.4, Gemini, etc.)
+- **Task Board** — Kanban drag-and-drop (Inbox → Assigned → In Progress → Review → Done)
+- **Activity Feed** — Live-streaming events from all agents, filterable by agent/type
+- **Cost Tracker** — Token usage and spend by model/agent with interactive charts
+- **Calendar/Cron** — Cron job visualization and scheduling
+- **Memory Browser** — View and edit agent memory files
+- **Notifications** — Items requiring human attention
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js 22+** (see `.nvmrc`)
+- **pnpm** (enabled via corepack)
+- A **Supabase** project (free tier works)
+
+### Local Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Clone and install
+git clone https://github.com/openclaw/mission-control.git
+cd mission-control
+corepack enable && corepack prepare pnpm@latest --activate
+pnpm install
+
+# Configure environment
+cp .env.example .env.local
+# Edit .env.local with your Supabase credentials and gateway URL
+
+# Start dev server
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### One-Command Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bash install.sh
+```
 
-## Learn More
+This detects your environment, installs dependencies, generates `.env.local`, and starts the dev server.
 
-To learn more about Next.js, take a look at the following resources:
+### Docker
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Build and run
+docker compose up -d
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Or build manually
+docker build -t openclaw-mc .
+docker run -p 3000:3000 --env-file .env openclaw-mc
+```
 
-## Deploy on Vercel
+### Railway
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Connect this repo to [Railway](https://railway.app)
+2. Set the environment variables listed in `.env.example`
+3. Railway auto-detects Next.js and deploys
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Environment Variables
+
+See [`.env.example`](.env.example) for all variables with documentation. Key ones:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | Supabase publishable/anon key |
+| `SUPABASE_SERVICE_KEY` | Yes | Supabase secret/service key |
+| `OPENCLAW_GATEWAY_URL` | Yes | WSS URL to OpenClaw gateway |
+| `OPENCLAW_GATEWAY_TOKEN` | Yes | Gateway auth token |
+| `PORT` | No | Server port (default: 3000) |
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript (strict) |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Database | Supabase (Postgres + Realtime) |
+| Charts | Recharts |
+| State | Zustand |
+| Deployment | Railway / Docker |
+
+## Project Structure
+
+```
+src/
+  app/           # Next.js App Router pages
+  components/    # React components
+  lib/           # Utilities, Supabase client, stores
+  types/         # TypeScript type definitions
+docs/            # Documentation
+scripts/         # Build and setup scripts
+```
+
+## Scripts
+
+```bash
+pnpm dev         # Dev server (localhost:3000)
+pnpm build       # Production build
+pnpm start       # Start production server
+pnpm lint        # ESLint
+```
+
+## Documentation
+
+- [Quick Start Guide](docs/quickstart.md)
+- [Deployment Guide](docs/deployment.md)
+- [Configuration Reference](docs/configuration.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+[MIT](LICENSE)
