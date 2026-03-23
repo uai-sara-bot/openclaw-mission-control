@@ -1,6 +1,11 @@
+import type { Metadata } from 'next'
 import { AgentCard } from '@/components/agents/AgentCard'
 import { Agent } from '@/types'
 import { Activity, DollarSign, Users, Zap } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+}
 
 // Our 13 agents - will be fetched from Supabase later
 const agents: Agent[] = [
@@ -38,7 +43,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Agents" value={agents.length.toString()} icon={Users} color="text-[var(--accent-blue)]" />
         <StatCard label="Active Now" value={activeAgents.toString()} icon={Zap} color="text-[var(--accent-green)]" />
         <StatCard label="Tokens Today" value={totalTokens.toLocaleString()} icon={Activity} color="text-[var(--accent-purple)]" />
@@ -48,7 +53,7 @@ export default function Dashboard() {
       {/* Agents Grid */}
       <div>
         <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Agent Fleet</h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agents.map(agent => (
             <AgentCard key={agent.id} agent={agent} />
           ))}

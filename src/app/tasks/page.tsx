@@ -1,5 +1,10 @@
+import type { Metadata } from 'next'
 import { Task } from '@/types'
 import { CircleDot, Clock, AlertTriangle, ArrowUp, ArrowRight, ArrowDown, User } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Task Board',
+}
 
 const tasks: Task[] = [
   { id: '1', title: 'Review ENGAGE project architecture', description: 'Evaluate current architecture and suggest improvements', status: 'inbox', priority: 'high', assigned_to: null, created_by: 'user', due_date: '2026-03-25', created_at: '2026-03-22T10:00:00Z', updated_at: '2026-03-22T10:00:00Z' },
@@ -80,7 +85,7 @@ export default function TasksPage() {
         <span className="text-sm text-[var(--text-muted)]">{tasks.length} tasks</span>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 min-h-[calc(100vh-10rem)]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 min-h-[calc(100vh-10rem)]">
         {columns.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.key)
           return (

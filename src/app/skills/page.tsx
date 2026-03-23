@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import {
-  Shield, Zap, Eye, Search as SearchIcon, Bug, CheckCircle, AlertTriangle,
-  Clock, Play, Package, Info, ChevronDown, ChevronUp
+  Shield, Eye, Search as SearchIcon, Bug, CheckCircle, AlertTriangle,
+  ChevronDown, ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -124,7 +124,7 @@ export default function SkillsPage() {
       </div>
 
       {/* Scan Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[var(--accent-green)]/10 flex items-center justify-center">
             <CheckCircle size={18} className="text-[var(--accent-green)]" />

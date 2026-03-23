@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { CronJob } from '@/types'
 import {
-  Clock, Play, Pause, CheckCircle, XCircle, AlertTriangle,
-  RefreshCw, Calendar, Timer
+  Clock, CheckCircle, XCircle, AlertTriangle,
+  Calendar, Timer
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -213,6 +213,9 @@ export default function CalendarPage() {
               {/* Toggle */}
               <button
                 onClick={() => toggleJob(job.id)}
+                aria-label={`${job.status === 'enabled' ? 'Disable' : 'Enable'} ${job.name}`}
+                role="switch"
+                aria-checked={job.status === 'enabled'}
                 className={cn(
                   'relative w-11 h-6 rounded-full transition-colors shrink-0 mt-1',
                   job.status === 'enabled' ? 'bg-[var(--accent-blue)]' : 'bg-[var(--border)]'

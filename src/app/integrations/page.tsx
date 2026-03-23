@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   MessageSquare, Brain, DollarSign, GitBranch, Cloud, CheckSquare,
-  Mic, Play, Search, ExternalLink, Settings, Plug, Unplug
+  Mic, Play, Search, Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
