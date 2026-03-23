@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import {
-  Shield, ShieldCheck, ShieldAlert, Lock, Unlock, Key,
-  AlertTriangle, CheckCircle, XCircle, Clock, Search, Filter
+  ShieldAlert, Lock, Unlock, Key,
+  AlertTriangle, CheckCircle, XCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

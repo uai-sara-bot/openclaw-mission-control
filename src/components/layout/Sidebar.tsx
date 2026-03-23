@@ -43,7 +43,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+      <nav aria-label="Main navigation" className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href
           return (

@@ -1,5 +1,6 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import { Metric } from '@/types'
 import { DollarSign, Zap, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -74,11 +75,12 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 
 export default function CostsPage() {
   const sortedAgents = [...metrics].sort((a, b) => b.cost - a.cost)
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Cost Tracker</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Cost Tracker</h1>
         <p className="text-sm text-[var(--text-muted)] mt-1">Token usage and costs across all agents</p>
       </div>
 
@@ -91,7 +93,7 @@ export default function CostsPage() {
               <DollarSign size={16} className="text-[var(--accent-green)]" />
             </span>
           </div>
-          <p className="text-2xl font-semibold text-white font-mono">{formatCost(totalCost)}</p>
+          <p className="text-2xl font-semibold text-[var(--text-primary)] font-mono">{formatCost(totalCost)}</p>
           <div className="flex items-center gap-1 mt-2 text-xs">
             <ArrowUp size={12} className="text-[var(--accent-red)]" />
             <span className="text-[var(--accent-red)]">12.3%</span>
@@ -106,7 +108,7 @@ export default function CostsPage() {
               <Zap size={16} className="text-[var(--accent-blue)]" />
             </span>
           </div>
-          <p className="text-2xl font-semibold text-white font-mono">{formatTokens(totalTokens)}</p>
+          <p className="text-2xl font-semibold text-[var(--text-primary)] font-mono">{formatTokens(totalTokens)}</p>
           <div className="flex items-center gap-1 mt-2 text-xs">
             <ArrowDown size={12} className="text-[var(--accent-green)]" />
             <span className="text-[var(--accent-green)]">4.1%</span>
@@ -121,7 +123,7 @@ export default function CostsPage() {
               <TrendingUp size={16} className="text-[var(--accent-purple)]" />
             </span>
           </div>
-          <p className="text-2xl font-semibold text-white font-mono">{formatCost(avgCostPerRequest)}</p>
+          <p className="text-2xl font-semibold text-[var(--text-primary)] font-mono">{formatCost(avgCostPerRequest)}</p>
           <div className="flex items-center gap-1 mt-2 text-xs">
             <ArrowDown size={12} className="text-[var(--accent-green)]" />
             <span className="text-[var(--accent-green)]">2.7%</span>
@@ -134,47 +136,53 @@ export default function CostsPage() {
       <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
         <h2 className="text-sm font-medium text-[var(--text-primary)] mb-4">Token Usage — Last 7 Days</h2>
         <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={dailyUsage} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-                axisLine={{ stroke: 'var(--border)' }}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={formatTokens}
-                tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
-                axisLine={{ stroke: 'var(--border)' }}
-                tickLine={false}
-              />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }}
-              />
-              <Line
-                type="monotone"
-                dataKey="input"
-                name="Input Tokens"
-                stroke="var(--accent-blue)"
-                strokeWidth={2}
-                dot={{ fill: 'var(--accent-blue)', r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="output"
-                name="Output Tokens"
-                stroke="var(--accent-purple)"
-                strokeWidth={2}
-                dot={{ fill: 'var(--accent-purple)', r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {mounted ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dailyUsage} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                  axisLine={{ stroke: 'var(--border)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={formatTokens}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
+                  axisLine={{ stroke: 'var(--border)' }}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="input"
+                  name="Input Tokens"
+                  stroke="var(--accent-blue)"
+                  strokeWidth={2}
+                  dot={{ fill: 'var(--accent-blue)', r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="output"
+                  name="Output Tokens"
+                  stroke="var(--accent-purple)"
+                  strokeWidth={2}
+                  dot={{ fill: 'var(--accent-purple)', r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] text-sm">
+              Loading chart...
+            </div>
+          )}
         </div>
       </div>
 
@@ -187,12 +195,12 @@ export default function CostsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left">
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Agent</th>
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Model</th>
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Input Tokens</th>
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Output Tokens</th>
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Total Tokens</th>
-                <th className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Cost</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Agent</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Model</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Input Tokens</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Output Tokens</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Total Tokens</th>
+                <th scope="col" className="px-5 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Cost</th>
               </tr>
             </thead>
             <tbody>

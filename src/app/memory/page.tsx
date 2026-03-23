@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   Brain, FolderTree, FileText, Search, ChevronRight, ChevronDown,
-  User, Bot, Eye, Pencil, Trash2
+  Bot, Eye, Pencil, Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -33,12 +33,6 @@ const typeConfig = {
   episodic: { label: 'Episodic', color: 'text-[var(--accent-blue)]', bg: 'bg-[var(--accent-blue)]/10' },
   semantic: { label: 'Semantic', color: 'text-[var(--accent-purple)]', bg: 'bg-[var(--accent-purple)]/10' },
   procedural: { label: 'Procedural', color: 'text-[var(--accent-green)]', bg: 'bg-[var(--accent-green)]/10' },
-}
-
-interface FolderNode {
-  agent: string
-  files: MemoryFile[]
-  expanded: boolean
 }
 
 export default function MemoryPage() {
@@ -189,13 +183,13 @@ export default function MemoryPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
+                  <button aria-label="View file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
                     <Eye size={14} />
                   </button>
-                  <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
+                  <button aria-label="Edit file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
+                  <button aria-label="Delete file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>

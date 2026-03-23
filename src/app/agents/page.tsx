@@ -76,6 +76,7 @@ export default function AgentsPage() {
           <input
             type="text"
             placeholder="Search agents..."
+            aria-label="Search agents"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-blue)] transition-colors"
@@ -101,16 +102,16 @@ export default function AgentsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              <th className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Name</th>
-              <th className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Model</th>
-              <th className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Status</th>
-              <th className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Channel</th>
-              <th className="text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Tokens Today</th>
-              <th className="text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Last Seen</th>
+              <th scope="col" className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Name</th>
+              <th scope="col" className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Model</th>
+              <th scope="col" className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Status</th>
+              <th scope="col" className="text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Channel</th>
+              <th scope="col" className="text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Tokens Today</th>
+              <th scope="col" className="text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider px-4 py-3">Last Seen</th>
             </tr>
           </thead>
           <tbody>

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import {
-  Settings, Globe, Bell, Database, Info, Shield, Save,
-  Moon, Monitor, Wifi, Clock, Trash2
+  Settings, Globe, Bell, Database, Info,
+  Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +16,26 @@ const sections: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'data', label: 'Data Retention', icon: Database },
   { id: 'about', label: 'About', icon: Info },
 ]
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={cn(
+        'relative w-9 h-5 rounded-full transition-colors',
+        checked ? 'bg-[var(--accent-blue)]' : 'bg-[var(--border)]'
+      )}
+    >
+      <div className={cn(
+        'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+        checked ? 'translate-x-4.5' : 'translate-x-0.5'
+      )} />
+    </button>
+  )
+}
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<Section>('general')
@@ -30,21 +50,6 @@ export default function SettingsPage() {
   const [costThreshold, setCostThreshold] = useState('50')
   const [retentionActivity, setRetentionActivity] = useState('30')
   const [retentionMetrics, setRetentionMetrics] = useState('90')
-
-  const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
-    <button
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative w-9 h-5 rounded-full transition-colors',
-        checked ? 'bg-[var(--accent-blue)]' : 'bg-[var(--border)]'
-      )}
-    >
-      <div className={cn(
-        'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform',
-        checked ? 'translate-x-4.5' : 'translate-x-0.5'
-      )} />
-    </button>
-  )
 
   return (
     <div className="space-y-6">
@@ -158,7 +163,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-[var(--text-primary)]">Auto-Reconnect</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">Automatically reconnect on disconnect</p>
                   </div>
-                  <Toggle checked={reconnect} onChange={setReconnect} />
+                  <Toggle checked={reconnect} onChange={setReconnect} label="Auto-Reconnect" />
                 </div>
                 <div className="border-t border-[var(--border)]" />
                 <div className="flex items-center gap-3">
@@ -179,7 +184,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-[var(--text-primary)]">Agent Errors</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">Notify when any agent encounters an error</p>
                   </div>
-                  <Toggle checked={notifyErrors} onChange={setNotifyErrors} />
+                  <Toggle checked={notifyErrors} onChange={setNotifyErrors} label="Agent Errors notifications" />
                 </div>
                 <div className="border-t border-[var(--border)]" />
                 <div className="flex items-center justify-between">
@@ -187,7 +192,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-[var(--text-primary)]">Task Assignments</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">Notify when tasks need human review</p>
                   </div>
-                  <Toggle checked={notifyTasks} onChange={setNotifyTasks} />
+                  <Toggle checked={notifyTasks} onChange={setNotifyTasks} label="Task Assignment notifications" />
                 </div>
                 <div className="border-t border-[var(--border)]" />
                 <div className="flex items-center justify-between">
@@ -195,7 +200,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-[var(--text-primary)]">Cost Alerts</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">Notify when daily spend exceeds threshold</p>
                   </div>
-                  <Toggle checked={notifyCost} onChange={setNotifyCost} />
+                  <Toggle checked={notifyCost} onChange={setNotifyCost} label="Cost Alert notifications" />
                 </div>
                 {notifyCost && (
                   <div className="ml-4">
