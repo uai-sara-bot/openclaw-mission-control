@@ -3,15 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
-  LayoutDashboard, Users, ClipboardList, Activity, 
+  LayoutDashboard, Users, UserCircle, ClipboardList, Activity,
   DollarSign, Calendar, Brain, Settings, Bell,
-  Zap, Shield, FolderOpen
+  Zap, Shield, FolderOpen, Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
   { name: 'Agents', href: '/agents', icon: Users },
+  { name: 'Personas', href: '/personas', icon: UserCircle },
   { name: 'Tasks', href: '/tasks', icon: ClipboardList },
   { name: 'Activity', href: '/activity', icon: Activity },
   { name: 'Costs', href: '/costs', icon: DollarSign },
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'Security', href: '/security', icon: Shield },
   { name: 'Notifications', href: '/notifications', icon: Bell },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Gateway', href: '/gateway', icon: Globe },
 ]
 
 export function Sidebar() {

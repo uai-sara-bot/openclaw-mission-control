@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Search, Bell } from 'lucide-react'
+import { ThemeToggle } from './ThemeToggle'
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -17,6 +18,7 @@ const pageTitles: Record<string, string> = {
   '/security': 'Security',
   '/notifications': 'Notifications',
   '/settings': 'Settings',
+  '/gateway': 'Gateway',
 }
 
 export function TopBar() {
@@ -55,6 +57,9 @@ export function TopBar() {
           <span>Search...</span>
           <kbd className="ml-4 px-1.5 py-0.5 rounded bg-white/10 text-xs">⌘K</kbd>
         </div>
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
 
         {/* Notifications */}
         <button
