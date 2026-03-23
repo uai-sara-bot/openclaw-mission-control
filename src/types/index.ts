@@ -21,6 +21,10 @@ export interface Task {
   due_date: string | null
   created_at: string
   updated_at: string
+  tags: string[]
+  project: string | null
+  subtasks: { title: string; done: boolean }[]
+  comments: { author: string; text: string; timestamp: string }[]
 }
 
 export interface Activity {
@@ -40,6 +44,21 @@ export interface Metric {
   output_tokens: number
   cost: number
   timestamp: string
+}
+
+export interface Persona {
+  id: string
+  name: string
+  displayName: string
+  avatar: string
+  role: 'Frontend Developer' | 'Backend Developer' | 'QA Engineer' | 'DevOps' | 'Researcher' | 'Project Manager' | 'Security Engineer' | 'Technical Writer'
+  skills: string[]
+  description: string
+  status: 'active' | 'idle' | 'offline'
+  currentTask: string | null
+  agentId: string
+  model: string
+  channel: string
 }
 
 export interface CronJob {
