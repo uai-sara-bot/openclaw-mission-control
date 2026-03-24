@@ -1,214 +1,162 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Brain, FolderTree, FileText, Search, ChevronRight, ChevronDown,
-  Bot, Eye, Pencil, Trash2
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Search, Brain, FileText, Calendar } from 'lucide-react'
 
-interface MemoryFile {
+interface MemoryEntry {
   id: string
-  name: string
-  agent: string
-  type: 'episodic' | 'semantic' | 'procedural'
+  date: string
   size: string
-  modified: string
+  words: number
   content: string
 }
 
-const sampleFiles: MemoryFile[] = [
-  { id: '1', name: 'user-preferences.md', agent: 'main', type: 'semantic', size: '2.4 KB', modified: '2026-03-23T12:00:00Z', content: '# User Preferences\n\n- Prefers concise responses\n- Dark mode always\n- Communication style: direct, minimal\n- Timezone: UTC+1\n- Preferred models: Claude Opus for complex tasks, Sonnet for routine' },
-  { id: '2', name: 'project-context.md', agent: 'main', type: 'semantic', size: '5.1 KB', modified: '2026-03-23T10:30:00Z', content: '# Project Context\n\n## OpenClaw\nAI agent orchestration platform.\n\n## Current Sprint\n- Mission Control dashboard\n- Gateway WebSocket stability\n- Cost optimization for multi-model routing\n\n## Key Decisions\n- Next.js 15 for frontend\n- Supabase for persistence\n- Railway for deployment' },
-  { id: '3', name: 'api-patterns.md', agent: 'engage-dev', type: 'procedural', size: '3.8 KB', modified: '2026-03-22T16:20:00Z', content: '# API Patterns\n\n## REST Endpoints\n- Use kebab-case for URLs\n- Always return { data, error, meta }\n- Paginate with cursor-based pagination\n\n## Error Handling\n- 4xx: client errors with descriptive messages\n- 5xx: generic message, log details server-side' },
-  { id: '4', name: 'expense-rules.md', agent: 'finance', type: 'procedural', size: '1.9 KB', modified: '2026-03-22T09:15:00Z', content: '# Expense Rules\n\n- API costs > $50/day: alert immediately\n- Monthly budget: $3,000 for AI APIs\n- Categorize: infra, AI-api, SaaS, misc\n- Report weekly on Mondays' },
-  { id: '5', name: 'recent-conversations.md', agent: 'main', type: 'episodic', size: '8.2 KB', modified: '2026-03-23T14:30:00Z', content: '# Recent Conversations\n\n## 2026-03-23 14:30\nUser asked about deploying Mission Control to Railway.\nAdvised using Docker build with multi-stage Dockerfile.\n\n## 2026-03-23 11:00\nReviewed Q1 metrics. Total spend: $6,720.\nCreated follow-up task for cost optimization.' },
-  { id: '6', name: 'research-notes.md', agent: 'research', type: 'episodic', size: '6.5 KB', modified: '2026-03-23T11:15:00Z', content: '# Research Notes\n\n## Vector DB Evaluation\n- Pinecone: managed, easy setup, $70/mo\n- Qdrant: self-hosted, performant, free\n- Weaviate: hybrid search, good docs\n\nRecommendation: Qdrant for cost, Pinecone for speed-to-market' },
-  { id: '7', name: 'whatsapp-contacts.md', agent: 'whatsapp-cli', type: 'semantic', size: '1.2 KB', modified: '2026-03-21T08:00:00Z', content: '# WhatsApp Contacts\n\n- Alex (dev lead): +1-555-0101\n- Sara (PM): +1-555-0102\n- Finance bot group: "OpenClaw Finance"\n- Status updates group: "OC Status"' },
-  { id: '8', name: 'code-style.md', agent: 'engage-dev', type: 'procedural', size: '2.1 KB', modified: '2026-03-20T14:00:00Z', content: '# Code Style\n\n- TypeScript strict mode\n- Functional components only\n- Tailwind for styling, no CSS modules\n- Zustand for state management\n- Prefer named exports' },
+const entries: MemoryEntry[] = [
+  {
+    id: '1',
+    date: 'Thu, Mar 20',
+    size: '3.3 KB',
+    words: 772,
+    content: '# Thursday, March 20\n\n## Qwen 3.5 Medium Research\n\nResearched new Qwen model release. Key findings: significant improvement in reasoning tasks, 70% of GPT-4o cost, strong multilingual support.\n\nBenchmarks vs competitors:\n- MMLU: 85.2 (Qwen) vs 83.1 (GPT-4o-mini)\n- HumanEval: 76% vs 71%\n- Cost: $0.14/M tokens vs $0.20/M tokens\n\n## Mission Control Planning\n\nDiscussed new page designs with Awais. Phase 2+3 scope finalized:\n- Content pipeline Kanban\n- Approvals workflow\n- Projects tracker\n- Team org chart\n- People CRM\n- Docs browser\n- Memory upgrade\n- Council (multi-model)\n\n## Agent Updates\n\nCharlie completed Railway deploy without intervention — first fully autonomous deployment. Scout flagged 3 trending topics for content pipeline.'
+  },
+  {
+    id: '2',
+    date: 'Wed, Mar 19',
+    size: '2.1 KB',
+    words: 498,
+    content: '# Wednesday, March 19\n\n## Agent Coordination Improvement\n\nImplemented better handoff protocol between Henry and Charlie. No more duplicate task assignments.\n\nKey change: Henry now writes explicit delegation notes in the task title, not just the body.\n\n## Supabase Integration\n\nStarted planning database schema for Mission Control:\n- agents table\n- tasks table\n- approvals table\n- content_items table\n- memory_entries table\n\n## Notes\n\n- OpenAI o3 benchmarks leaked — impressive on math but expensive\n- Consider switching Scout to Gemini Flash for cost savings'
+  },
+  {
+    id: '3',
+    date: 'Tue, Mar 18',
+    size: '4.7 KB',
+    words: 1102,
+    content: '# Tuesday, March 18\n\n## Architecture Discussion\n\nDecided to use file system as database for now. Simple, fast, no infra needed. Perfect is the enemy of done.\n\nDecision tree:\n- Current scale: file system ✓\n- 100+ daily entries: SQLite\n- Multi-agent concurrent writes: Supabase\n\n## Mission Control Phase 1 Launch\n\nLaunched to Railway. Initial pages:\n- Dashboard\n- Agents\n- Tasks\n- Memory (v1)\n- Activity\n- Costs\n\n## Awais Notes\n\n- Wants dark theme throughout, no light mode by default\n- Teal as primary accent color\n- Cards with subtle borders, not heavy shadows\n- "Like Linear but for AI agents"\n\n## Agent Performance Review\n\nScout: 9/10 — great trend signals this week\nQuill: 8/10 — newsletter draft needed 2 revisions\nCharlie: 10/10 — flawless infra week\nCodex: 7/10 — one failed PR, good recovery\nHenry: 9/10 — coordination improving'
+  },
 ]
 
-const agents = [...new Set(sampleFiles.map(f => f.agent))].sort()
-const typeConfig = {
-  episodic: { label: 'Episodic', color: 'text-[var(--accent-blue)]', bg: 'bg-[var(--accent-blue)]/10' },
-  semantic: { label: 'Semantic', color: 'text-[var(--accent-purple)]', bg: 'bg-[var(--accent-purple)]/10' },
-  procedural: { label: 'Procedural', color: 'text-[var(--accent-green)]', bg: 'bg-[var(--accent-green)]/10' },
+const groups = [
+  { label: 'This Week', ids: ['1', '2', '3'] },
+  { label: 'Last Week', ids: [] },
+  { label: 'February 2026', ids: [] },
+]
+
+function renderContent(content: string) {
+  return content.split('\n').map((line, i) => {
+    if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold text-white mb-4 mt-6 first:mt-0">{line.slice(2)}</h1>
+    if (line.startsWith('## ')) return <h2 key={i} className="text-base font-semibold text-teal-300 mb-2 mt-5">{line.slice(3)}</h2>
+    if (line.startsWith('### ')) return <h3 key={i} className="text-sm font-semibold text-white mb-2 mt-4">{line.slice(4)}</h3>
+    if (line.startsWith('- ')) return <li key={i} className="ml-4 text-sm mb-1 list-disc" style={{ color: 'var(--text-secondary)' }}>{line.slice(2)}</li>
+    if (line === '') return <div key={i} className="mb-2" />
+    return <p key={i} className="text-sm mb-1.5" style={{ color: 'var(--text-secondary)' }}>{line}</p>
+  })
 }
 
 export default function MemoryPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [agentFilter, setAgentFilter] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<MemoryFile | null>(sampleFiles[0])
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set(agents))
+  const [selected, setSelected] = useState(entries[0].id)
+  const [search, setSearch] = useState('')
 
-  const filtered = sampleFiles.filter(f => {
-    if (agentFilter && f.agent !== agentFilter) return false
-    if (searchQuery && !f.name.toLowerCase().includes(searchQuery.toLowerCase()) && !f.content.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
+  const selectedEntry = entries.find(e => e.id === selected)
 
-  const groupedByAgent = agents.reduce<Record<string, MemoryFile[]>>((acc, agent) => {
-    const files = filtered.filter(f => f.agent === agent)
-    if (files.length > 0) acc[agent] = files
-    return acc
-  }, {})
-
-  const toggleAgent = (agent: string) => {
-    setExpandedAgents(prev => {
-      const next = new Set(prev)
-      if (next.has(agent)) next.delete(agent)
-      else next.add(agent)
-      return next
-    })
-  }
+  const filtered = entries.filter(e =>
+    !search || e.date.toLowerCase().includes(search.toLowerCase()) || e.content.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-[var(--text-primary)]">Memory Browser</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">View and manage agent memory files</p>
-      </div>
-
-      {/* Agent filter */}
-      <div className="flex items-center gap-2">
-        <Bot size={14} className="text-[var(--text-muted)]" />
-        <span className="text-xs text-[var(--text-muted)]">Agent:</span>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setAgentFilter(null)}
-            className={cn(
-              'px-2.5 py-1 rounded-md text-xs transition-colors',
-              agentFilter === null
-                ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
-                : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            )}
-          >
-            All
-          </button>
-          {agents.map(agent => (
-            <button
-              key={agent}
-              onClick={() => setAgentFilter(agentFilter === agent ? null : agent)}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-xs transition-colors',
-                agentFilter === agent
-                  ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
-                  : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              )}
-            >
-              {agent}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main layout */}
-      <div className="flex gap-4" style={{ minHeight: '60vh' }}>
-        {/* File Tree Sidebar */}
-        <div className="w-72 shrink-0 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden flex flex-col">
-          <div className="p-3 border-b border-[var(--border)]">
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                placeholder="Search files..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-blue)]/50"
-              />
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+      {/* Left Column */}
+      <div className="w-72 flex flex-col border-r border-white/10" style={{ background: 'var(--bg-secondary)' }}>
+        {/* Long-term memory card */}
+        <div className="p-4 border-b border-white/10">
+          <div className="flex items-center gap-2 mb-2">
+            <Brain size={16} className="text-teal-400" />
+            <span className="text-sm font-semibold text-white">Long-Term Memory</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg p-2 bg-white/5 text-center">
+              <p className="text-lg font-bold text-teal-400">47</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>journal entries</p>
+            </div>
+            <div className="rounded-lg p-2 bg-white/5 text-center">
+              <p className="text-lg font-bold text-purple-400">128K</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>total words</p>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {Object.entries(groupedByAgent).map(([agent, files]) => (
-              <div key={agent}>
-                <button
-                  onClick={() => toggleAgent(agent)}
-                  className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-md hover:bg-white/5 transition-colors"
-                >
-                  {expandedAgents.has(agent) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  <FolderTree size={12} className="text-[var(--accent-orange)]" />
-                  <span className="font-medium">{agent}</span>
-                  <span className="ml-auto text-[var(--text-muted)]">{files.length}</span>
-                </button>
-                {expandedAgents.has(agent) && (
-                  <div className="ml-4 space-y-0.5">
-                    {files.map(file => (
-                      <button
-                        key={file.id}
-                        onClick={() => setSelectedFile(file)}
-                        className={cn(
-                          'flex items-center gap-1.5 w-full px-2 py-1.5 text-xs rounded-md transition-colors',
-                          selectedFile?.id === file.id
-                            ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
-                        )}
-                      >
-                        <FileText size={12} />
-                        <span className="truncate">{file.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            {Object.keys(groupedByAgent).length === 0 && (
-              <p className="text-xs text-[var(--text-muted)] text-center py-4">No files match your search.</p>
-            )}
-          </div>
-          <div className="p-3 border-t border-[var(--border)]">
-            <p className="text-[10px] text-[var(--text-muted)]">{filtered.length} files · {agents.length} agents</p>
+        </div>
+
+        {/* Search */}
+        <div className="px-3 py-2 border-b border-white/10">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+            <Search size={12} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search memory..."
+              className="bg-transparent text-xs text-white placeholder-white/30 outline-none flex-1"
+            />
           </div>
         </div>
 
-        {/* Content Viewer */}
-        <div className="flex-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden flex flex-col">
-          {selectedFile ? (
-            <>
-              <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-                <div className="flex items-center gap-3">
-                  <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', typeConfig[selectedFile.type].bg)}>
-                    <Brain size={16} className={typeConfig[selectedFile.type].color} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-[var(--text-primary)]">{selectedFile.name}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', typeConfig[selectedFile.type].bg, typeConfig[selectedFile.type].color)}>
-                        {typeConfig[selectedFile.type].label}
-                      </span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{selectedFile.agent}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">·</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{selectedFile.size}</span>
+        {/* Entry list */}
+        <div className="flex-1 overflow-y-auto">
+          {groups.map(group => {
+            const groupEntries = filtered.filter(e => group.ids.includes(e.id))
+            if (groupEntries.length === 0 && group.ids.length > 0) return null
+            if (group.ids.length === 0) return (
+              <div key={group.label} className="px-3 py-2">
+                <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{group.label}</p>
+                <p className="text-xs px-2 py-1" style={{ color: 'var(--text-muted)' }}>No entries</p>
+              </div>
+            )
+            return (
+              <div key={group.label} className="mb-2">
+                <p className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2" style={{ color: 'var(--text-muted)' }}>{group.label}</p>
+                {groupEntries.map(entry => (
+                  <button
+                    key={entry.id}
+                    onClick={() => setSelected(entry.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-l-2 ${
+                      selected === entry.id
+                        ? 'border-l-teal-500 bg-teal-500/10'
+                        : 'border-l-transparent hover:bg-white/5'
+                    }`}
+                  >
+                    <Calendar size={13} className={selected === entry.id ? 'text-teal-400' : 'text-white/30'} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${selected === entry.id ? 'text-teal-300' : 'text-white'}`}>
+                        {entry.date}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {entry.size} · {entry.words.toLocaleString()} words
+                      </p>
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button aria-label="View file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
-                    <Eye size={14} />
                   </button>
-                  <button aria-label="Edit file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
-                    <Pencil size={14} />
-                  </button>
-                  <button aria-label="Delete file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                ))}
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-mono leading-relaxed">
-                  {selectedFile.content}
-                </pre>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <Brain size={32} className="mx-auto text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">Select a file to view its contents</p>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Right Column — Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {selectedEntry ? (
+          <>
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
+              <FileText size={16} className="text-teal-400" />
+              <div>
+                <p className="text-sm font-medium text-white">{selectedEntry.date}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedEntry.size} · {selectedEntry.words.toLocaleString()} words</p>
               </div>
             </div>
-          )}
-        </div>
+            <div>{renderContent(selectedEntry.content)}</div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p style={{ color: 'var(--text-muted)' }}>Select an entry</p>
+          </div>
+        )}
       </div>
     </div>
   )
