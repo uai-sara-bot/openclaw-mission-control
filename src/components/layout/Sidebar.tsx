@@ -5,8 +5,7 @@ import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Activity,
   DollarSign, Calendar, Brain, Settings, Bell,
-  Zap, Shield, FolderOpen, Globe, Video, CheckSquare,
-  MessageSquare, Folder, FileText, Users2, Building2, Network
+  Zap, Shield, FolderOpen, Globe, Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +24,7 @@ const navigation = [
   { name: 'Notifications', href: '/notifications', icon: Bell },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Gateway', href: '/gateway', icon: Globe },
+  { name: 'Office', href: '/office', icon: Building2 },
 ]
 
 const extendedNavigation = [

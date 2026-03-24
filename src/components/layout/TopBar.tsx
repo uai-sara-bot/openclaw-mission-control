@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
-import { Search, Bell, PauseCircle } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { Bell, CheckCheck, AlertTriangle, CheckCircle, Search } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import toast, { Toaster } from 'react-hot-toast'
 
@@ -20,14 +20,20 @@ const pageTitles: Record<string, string> = {
   '/notifications': 'Notifications',
   '/settings': 'Settings',
   '/gateway': 'Gateway',
-  '/content': 'Content',
-  '/approvals': 'Approvals',
-  '/council': 'Council',
-  '/projects': 'Projects',
-  '/docs': 'Docs',
-  '/people': 'People',
-  '/office': 'Office',
-  '/team': 'Team',
+  '/office': 'The Office',
+}
+
+const initialNotifications = [
+  { id: '1', type: 'task', text: 'Quill completed "Newsletter Draft #47"', time: '2m ago', unread: true },
+  { id: '2', type: 'approval', text: 'Ralph needs approval on deployment PR', time: '15m ago', unread: true },
+  { id: '3', type: 'alert', text: 'Cost alert: approaching $50 daily limit', time: '1h ago', unread: true },
+  { id: '4', type: 'task', text: 'Scout completed "Competitor Analysis"', time: '2h ago', unread: false },
+]
+
+function NotifIcon({ type }: { type: string }) {
+  if (type === 'approval') return <AlertTriangle size={13} className="text-yellow-400 shrink-0" />
+  if (type === 'alert') return <AlertTriangle size={13} className="text-red-400 shrink-0" />
+  return <CheckCircle size={13} className="text-green-400 shrink-0" />
 }
 
 export function TopBar() {
@@ -36,6 +42,11 @@ export function TopBar() {
   const title = pageTitles[pathname] ?? 'Dashboard'
 
   const [clock, setClock] = useState('')
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState(initialNotifications)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const unreadCount = notifications.filter(n => n.unread).length
 
   useEffect(() => {
     function updateClock() {
@@ -45,6 +56,21 @@ export function TopBar() {
     const interval = setInterval(updateClock, 10_000)
     return () => clearInterval(interval)
   }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [notifOpen])
+
+  function markAllRead() {
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })))
+  }
 
   return (
     <>
@@ -71,16 +97,12 @@ export function TopBar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--border)] text-[var(--text-muted)] text-sm">
-            <Search size={14} />
-            <span>Search...</span>
-            <kbd className="ml-4 px-1.5 py-0.5 rounded bg-white/10 text-xs">⌘K</kbd>
-          </div>
-
-          {/* Theme Toggle */}
-          <ThemeToggle />
+      <div className="flex items-center gap-4">
+        {/* Search — keyboard shortcut ⌘K handled by CommandPalette */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-[var(--border)] text-[var(--text-muted)] text-sm cursor-pointer hover:bg-white/10 transition-colors select-none">
+          <Search size={14} />
+          <span>Search ⌘K</span>
+        </div>
 
           {/* Pause Button */}
           <button
@@ -92,14 +114,62 @@ export function TopBar() {
             <span>Pause</span>
           </button>
 
-          {/* Ping Henry Button */}
+        {/* Notifications */}
+        <div ref={dropdownRef} className="relative">
           <button
-            onClick={() => toast('Henry pinged!')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 text-sm font-medium transition-colors border border-teal-500/20"
-            aria-label="Ping Henry"
+            onClick={() => setNotifOpen(o => !o)}
+            className="relative p-2 rounded-lg hover:bg-white/5 transition-colors"
+            aria-label="View notifications"
           >
-            Ping Henry
+            <Bell size={18} className="text-[var(--text-secondary)]" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-[var(--accent-red)] text-white text-[9px] font-bold px-0.5">
+                {unreadCount}
+              </span>
+            )}
           </button>
+
+          {notifOpen && (
+            <div className="absolute right-0 top-10 w-80 bg-[#111118] border border-white/15 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <span className="text-sm font-medium text-white">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="text-xs text-gray-400">{unreadCount} unread</span>
+                )}
+              </div>
+
+              <div className="max-h-64 overflow-y-auto">
+                {notifications.map(n => (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${n.unread ? 'bg-white/[0.02]' : ''}`}
+                  >
+                    <div className="mt-0.5">
+                      <NotifIcon type={n.type} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-200 leading-snug">{n.text}</p>
+                      <p className="text-[10px] text-gray-500 mt-1">{n.time}</p>
+                    </div>
+                    {n.unread && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 mt-1" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-4 py-2.5 border-t border-white/10">
+                <button
+                  onClick={markAllRead}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+                >
+                  <CheckCheck size={13} />
+                  Mark all read
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
           {/* Notifications Bell */}
           <button
