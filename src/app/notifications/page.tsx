@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import {
   Bell, AlertTriangle, CheckCircle, Info, XCircle, MessageSquare,
   DollarSign, Shield, Bot, Filter, Check, Trash2
@@ -14,25 +15,11 @@ interface Notification {
   type: NotificationType
   title: string
   message: string
-  timestamp: string
+  created_at: string
   read: boolean
-  agent: string | null
+  agent?: string | null
+  agent_name?: string | null
 }
-
-const sampleNotifications: Notification[] = [
-  { id: '1', type: 'error', title: 'Agent Connection Failed', message: 'ElevenLabs integration lost connection — API key expired. Re-authenticate to restore voice synthesis.', timestamp: '2026-03-23T14:30:00Z', read: false, agent: null },
-  { id: '2', type: 'warning', title: 'Trust Score Alert', message: 'whatsapp-cli agent trust score dropped below 60. Review recent actions and PII handling.', timestamp: '2026-03-23T14:15:00Z', read: false, agent: 'whatsapp-cli' },
-  { id: '3', type: 'task', title: 'Task Needs Review', message: '"Evaluate vector DB options" moved to Review by research agent. Human review required.', timestamp: '2026-03-23T13:58:00Z', read: false, agent: 'research' },
-  { id: '4', type: 'security', title: 'Failed Login Attempt', message: 'Invalid password from IP 203.0.xx.xx — 1 of 3 attempts. No action required yet.', timestamp: '2026-03-23T13:45:00Z', read: false, agent: null },
-  { id: '5', type: 'cost', title: 'Daily Spend Update', message: 'Current daily spend: $47.20 (94% of $50 threshold). Monitor closely.', timestamp: '2026-03-23T12:00:00Z', read: true, agent: null },
-  { id: '6', type: 'success', title: 'Build Passed', message: 'ENGAGE frontend build completed — all 47 tests passed.', timestamp: '2026-03-23T11:45:00Z', read: true, agent: 'engage-dev' },
-  { id: '7', type: 'info', title: 'Agent Started', message: 'general-work agent connected to gateway and is ready to accept tasks.', timestamp: '2026-03-23T11:22:00Z', read: true, agent: 'general-work' },
-  { id: '8', type: 'security', title: 'Token Rotated', message: 'Gateway authentication token was auto-rotated successfully.', timestamp: '2026-03-23T10:15:00Z', read: true, agent: null },
-  { id: '9', type: 'warning', title: 'SearXNG Unreachable', message: 'Local SearXNG instance not responding. Research agent web search degraded.', timestamp: '2026-03-23T09:30:00Z', read: true, agent: 'research' },
-  { id: '10', type: 'info', title: 'Security Audit Complete', message: 'Daily audit completed for 9 agents. 0 critical issues, 2 warnings.', timestamp: '2026-03-23T06:00:00Z', read: true, agent: null },
-  { id: '11', type: 'cost', title: 'Weekly Cost Report', message: 'Week ending Mar 22: total spend $312.40 across all models. 8% under budget.', timestamp: '2026-03-22T23:00:00Z', read: true, agent: null },
-  { id: '12', type: 'success', title: 'Memory Cleanup', message: 'Expired memory files purged. Freed 12 MB across 3 agents.', timestamp: '2026-03-22T18:00:00Z', read: true, agent: 'main' },
-]
 
 const typeConfig: Record<NotificationType, { icon: React.ElementType; color: string; bg: string }> = {
   error: { icon: XCircle, color: 'text-[var(--accent-red)]', bg: 'bg-[var(--accent-red)]/10' },
@@ -44,11 +31,16 @@ const typeConfig: Record<NotificationType, { icon: React.ElementType; color: str
   security: { icon: Shield, color: 'text-[var(--accent-blue)]', bg: 'bg-[var(--accent-blue)]/10' },
 }
 
+function getTypeConfig(type: string) {
+  return typeConfig[type as NotificationType] || typeConfig.info
+}
+
 function formatTime(timestamp: string) {
   const date = new Date(timestamp)
-  const now = new Date('2026-03-23T15:00:00Z')
+  const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
   if (diffMin < 60) return `${diffMin}m ago`
   const diffHr = Math.floor(diffMin / 60)
   if (diffHr < 24) return `${diffHr}h ago`
@@ -57,9 +49,35 @@ function formatTime(timestamp: string) {
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(sampleNotifications)
-  const [typeFilter, setTypeFilter] = useState<NotificationType | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
+
+  useEffect(() => {
+    async function fetchData() {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (error) console.error('Notifications fetch error:', error)
+      if (data) setNotifications(data)
+      setLoading(false)
+    }
+    fetchData()
+
+    const sub = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+        if (payload.eventType === 'INSERT') setNotifications(prev => [payload.new as Notification, ...prev])
+        if (payload.eventType === 'UPDATE') setNotifications(prev => prev.map(n => n.id === (payload.new as Notification).id ? payload.new as Notification : n))
+        if (payload.eventType === 'DELETE') setNotifications(prev => prev.filter(n => n.id !== (payload.old as Notification).id))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
 
   const filtered = notifications.filter(n => {
     if (typeFilter && n.type !== typeFilter) return false
@@ -69,16 +87,30 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const markAsRead = (id: string) => {
+  async function markAsRead(id: string) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    await supabase.from('notifications').update({ read: true }).eq('id', id)
   }
 
-  const markAllAsRead = () => {
+  async function markAllAsRead() {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    if (unreadIds.length > 0) {
+      await supabase.from('notifications').update({ read: true }).in('id', unreadIds)
+    }
   }
 
-  const dismiss = (id: string) => {
+  async function dismiss(id: string) {
     setNotifications(prev => prev.filter(n => n.id !== id))
+    await supabase.from('notifications').delete().eq('id', id)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-teal-400 animate-pulse">Loading notifications...</div>
+      </div>
+    )
   }
 
   return (
@@ -102,17 +134,15 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-[var(--text-muted)]" />
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             <button
               onClick={() => setTypeFilter(null)}
               className={cn(
                 'px-2.5 py-1 rounded-md text-xs transition-colors',
-                typeFilter === null && !showUnreadOnly
-                  ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
-                  : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                typeFilter === null ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]' : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               )}
             >
               All
@@ -124,10 +154,8 @@ export default function NotificationsPage() {
                   key={type}
                   onClick={() => setTypeFilter(typeFilter === type ? null : type)}
                   className={cn(
-                    'px-2.5 py-1 rounded-md text-xs transition-colors capitalize flex items-center gap-1',
-                    typeFilter === type
-                      ? `${config.bg} ${config.color}`
-                      : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    'px-2.5 py-1 rounded-md text-xs transition-colors capitalize',
+                    typeFilter === type ? `${config.bg} ${config.color}` : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   )}
                 >
                   {type}
@@ -140,9 +168,7 @@ export default function NotificationsPage() {
           onClick={() => setShowUnreadOnly(!showUnreadOnly)}
           className={cn(
             'px-2.5 py-1 rounded-md text-xs transition-colors',
-            showUnreadOnly
-              ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
-              : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            showUnreadOnly ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]' : 'bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           )}
         >
           Unread only
@@ -151,15 +177,22 @@ export default function NotificationsPage() {
 
       {/* Notification List */}
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {notifications.length === 0 ? (
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-12 text-center">
+            <Bell size={32} className="mx-auto text-[var(--text-muted)] mb-3 opacity-50" />
+            <p className="text-sm text-[var(--text-muted)]">No notifications yet.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1 opacity-60">Alerts and events from agents will appear here.</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-8 text-center">
             <Bell size={24} className="mx-auto text-[var(--text-muted)] mb-2" />
             <p className="text-sm text-[var(--text-muted)]">No notifications match your filters.</p>
           </div>
         ) : (
           filtered.map(notification => {
-            const config = typeConfig[notification.type]
+            const config = getTypeConfig(notification.type)
             const Icon = config.icon
+            const agentName = notification.agent || notification.agent_name
             return (
               <div
                 key={notification.id}
@@ -174,23 +207,18 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className={cn(
-                        'text-sm text-[var(--text-primary)]',
-                        !notification.read && 'font-medium'
-                      )}>
+                      <h3 className={cn('text-sm text-[var(--text-primary)]', !notification.read && 'font-medium')}>
                         {notification.title}
                       </h3>
-                      {notification.agent && (
+                      {agentName && (
                         <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
                           <Bot size={10} />
-                          {notification.agent}
+                          {agentName}
                         </span>
                       )}
-                      {!notification.read && (
-                        <div className="w-2 h-2 rounded-full bg-[var(--accent-blue)]" />
-                      )}
+                      {!notification.read && <div className="w-2 h-2 rounded-full bg-[var(--accent-blue)]" />}
                       <span className="ml-auto text-[10px] text-[var(--text-muted)] font-mono shrink-0">
-                        {formatTime(notification.timestamp)}
+                        {formatTime(notification.created_at)}
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{notification.message}</p>

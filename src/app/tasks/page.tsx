@@ -1,55 +1,96 @@
 'use client'
 
-import { useState } from 'react'
-import toast from 'react-hot-toast'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import {
+  DndContext, DragEndEvent, DragOverlay, closestCenter,
+  PointerSensor, useSensor, useSensors, DragStartEvent
+} from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useDroppable } from '@dnd-kit/core'
 import { Plus, X, Clock } from 'lucide-react'
+import toast from 'react-hot-toast'
 
-// ── Types ──────────────────────────────────────────────────
-interface KanbanTask {
+// Types
+interface Task {
   id: string
+  run_id?: string
   title: string
-  description: string
+  description?: string
   status: 'recurring' | 'backlog' | 'inprogress' | 'review' | 'done'
-  assignee: 'Alex' | 'Henry' | 'All'
-  tag: string
-  tagColor: string
-  timestamp: string
+  assignee: string
+  project_tag?: string
+  tag_color?: string
+  created_at: string
+  updated_at?: string
+  completed_at?: string
+  source?: string
 }
 
-interface ActivityItem {
-  agent: string
-  agentColor: string
+interface ActivityEvent {
+  id: string
+  agent_name: string
   action: string
-  time: string
+  event_type: string
+  created_at: string
 }
 
-// ── Mock Data ──────────────────────────────────────────────
-const initialTasks: KanbanTask[] = [
-  { id: '1', title: 'Daily standup coordination', description: 'Coordinate async standups across all agent channels', status: 'recurring', assignee: 'Henry', tag: 'ops', tagColor: '#a855f7', timestamp: '2m ago' },
-  { id: '2', title: 'Weekly metrics digest', description: 'Compile token usage, task throughput, and cost breakdown', status: 'recurring', assignee: 'Alex', tag: 'reports', tagColor: '#3b82f6', timestamp: '1h ago' },
-  { id: '3', title: 'Review ENGAGE architecture', description: 'Evaluate current arch and suggest improvements for scalability', status: 'backlog', assignee: 'Henry', tag: 'infra', tagColor: '#f97316', timestamp: '3h ago' },
-  { id: '4', title: 'Research competitor pricing', description: 'Gather pricing data from top 5 competitors and compile comparison', status: 'backlog', assignee: 'Alex', tag: 'research', tagColor: '#22c55e', timestamp: '5h ago' },
-  { id: '5', title: 'SpacetimeDB server module', description: 'Build and test server-side module for real-time sync', status: 'inprogress', assignee: 'Henry', tag: 'dev', tagColor: '#3b82f6', timestamp: '10m ago' },
-  { id: '6', title: 'Mission Control Phase 1 UI', description: 'Build kanban, agents grid, and new nav items', status: 'inprogress', assignee: 'Alex', tag: 'frontend', tagColor: '#06b6d4', timestamp: '30m ago' },
-  { id: '7', title: 'Triage flaky tests in CI', description: 'Identify and fix intermittently failing tests in the pipeline', status: 'review', assignee: 'Henry', tag: 'qa', tagColor: '#f97316', timestamp: '1h ago' },
-  { id: '8', title: 'Auth middleware refactor', description: 'Refactor JWT validation and session handling middleware', status: 'done', assignee: 'Alex', tag: 'dev', tagColor: '#3b82f6', timestamp: '2h ago' },
-  { id: '9', title: 'Thumbnail batch generation', description: 'Generate 20 YouTube thumbnails using Flux2 LoRA model', status: 'done', assignee: 'Henry', tag: 'content', tagColor: '#ec4899', timestamp: '3h ago' },
-]
+// Sortable task card component
+function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
 
-const mockActivity: ActivityItem[] = [
-  { agent: 'Henry', agentColor: '#a855f7', action: 'completed task: Weekly metrics digest', time: '2m ago' },
-  { agent: 'Charlie', agentColor: '#3b82f6', action: 'pushed commit to SpacetimeDB module', time: '4m ago' },
-  { agent: 'Ralph', agentColor: '#f97316', action: 'opened PR: fix flaky integration tests', time: '8m ago' },
-  { agent: 'Scout', agentColor: '#22c55e', action: 'published competitor analysis report', time: '15m ago' },
-  { agent: 'Quill', agentColor: '#ec4899', action: 'drafted video script for YT channel', time: '22m ago' },
-  { agent: 'Henry', agentColor: '#a855f7', action: 'updated task: ENGAGE architecture review', time: '35m ago' },
-  { agent: 'Echo', agentColor: '#06b6d4', action: 'scheduled 5 social posts for tomorrow', time: '41m ago' },
-  { agent: 'Codex', agentColor: '#8b5cf6', action: 'merged auth middleware refactor', time: '52m ago' },
-  { agent: 'Charlie', agentColor: '#3b82f6', action: 'created branch: feat/spacetime-sync', time: '1h ago' },
-  { agent: 'Scout', agentColor: '#22c55e', action: 'flagged 3 competitor product launches', time: '1h ago' },
-]
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
 
-const COLUMNS: { key: KanbanTask['status']; label: string; color: string }[] = [
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      className="bg-[#1a1a24] border border-white/10 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-teal-500/30 transition-colors"
+    >
+      <h4 className="text-sm text-white font-medium mb-1 line-clamp-2">{task.title}</h4>
+      {task.description && (
+        <p className="text-xs text-gray-500 mb-2 line-clamp-1">{task.description}</p>
+      )}
+      <div className="flex items-center justify-between">
+        {task.project_tag && (
+          <span
+            className="text-xs px-2 py-0.5 rounded-full"
+            style={{
+              background: (task.tag_color || '#3b82f6') + '20',
+              color: task.tag_color || '#3b82f6',
+            }}
+          >
+            {task.project_tag}
+          </span>
+        )}
+        <span className="text-xs text-gray-400 ml-auto">{task.assignee}</span>
+      </div>
+    </div>
+  )
+}
+
+// Droppable column wrapper
+function DroppableColumn({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-1 space-y-2 min-h-[100px] rounded-lg transition-colors ${isOver ? 'bg-teal-500/5' : ''}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+const COLUMNS: { key: Task['status']; label: string; color: string }[] = [
   { key: 'recurring', label: 'Recurring', color: '#a855f7' },
   { key: 'backlog', label: 'Backlog', color: '#6b7280' },
   { key: 'inprogress', label: 'In Progress', color: '#3b82f6' },
@@ -57,60 +98,20 @@ const COLUMNS: { key: KanbanTask['status']; label: string; color: string }[] = [
   { key: 'done', label: 'Done', color: '#22c55e' },
 ]
 
-// ── Task Card ──────────────────────────────────────────────
-function TaskCard({ task, onClick }: { task: KanbanTask; onClick: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      className="bg-[#111118] border border-white/10 rounded-lg p-3 cursor-pointer hover:border-white/20 transition-all hover:shadow-lg hover:shadow-black/30"
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <h4 className="text-sm font-medium text-white leading-tight line-clamp-2">{task.title}</h4>
-        <span
-          className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white"
-          style={{ backgroundColor: task.assignee === 'Alex' ? '#3b82f6' : '#a855f7' }}
-        >
-          {task.assignee[0]}
-        </span>
-      </div>
-      <p className="text-xs text-gray-500 line-clamp-2 mb-3">{task.description}</p>
-      <div className="flex items-center justify-between">
-        <span
-          className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white/80"
-          style={{ backgroundColor: task.tagColor + '33', border: `1px solid ${task.tagColor}44` }}
-        >
-          {task.tag}
-        </span>
-        <span className="flex items-center gap-1 text-[10px] text-gray-500">
-          <Clock size={10} />
-          {task.timestamp}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-// ── New Task Modal ────────────────────────────────────────
-function NewTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (task: KanbanTask) => void }) {
+// New task modal
+function NewTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (t: Partial<Task>) => Promise<void> }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [assignee, setAssignee] = useState<KanbanTask['assignee']>('All')
-  const [status, setStatus] = useState<KanbanTask['status']>('backlog')
+  const [assignee, setAssignee] = useState('Awais')
+  const [status, setStatus] = useState<Task['status']>('backlog')
   const [tag, setTag] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) { toast('Please enter a title'); return }
-    onSave({
-      id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim() || 'No description',
-      assignee,
-      status,
-      tag: tag.trim() || 'general',
-      tagColor: '#6b7280',
-      timestamp: 'just now',
-    })
-    toast.success('Task created!')
+    setSaving(true)
+    await onSave({ title: title.trim(), description: description.trim(), assignee, status, project_tag: tag.trim() || undefined })
+    setSaving(false)
     onClose()
   }
 
@@ -147,33 +148,26 @@ function NewTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (task:
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Assignee</label>
-              <select
+              <input
                 value={assignee}
-                onChange={e => setAssignee(e.target.value as KanbanTask['assignee'])}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/50"
-              >
-                <option value="Alex">Alex</option>
-                <option value="Henry">Henry</option>
-                <option value="All">All agents</option>
-              </select>
+                onChange={e => setAssignee(e.target.value)}
+                placeholder="Assignee name..."
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-teal-500/50"
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-400 mb-1">Status</label>
               <select
                 value={status}
-                onChange={e => setStatus(e.target.value as KanbanTask['status'])}
+                onChange={e => setStatus(e.target.value as Task['status'])}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/50"
               >
-                <option value="recurring">Recurring</option>
-                <option value="backlog">Backlog</option>
-                <option value="inprogress">In Progress</option>
-                <option value="review">Review</option>
-                <option value="done">Done</option>
+                {COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Tag</label>
+            <label className="block text-xs text-gray-400 mb-1">Project Tag</label>
             <input
               value={tag}
               onChange={e => setTag(e.target.value)}
@@ -183,17 +177,11 @@ function NewTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (task:
           </div>
         </div>
         <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-gray-400 transition-colors"
-          >
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-gray-400 transition-colors">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm text-white font-medium transition-colors"
-          >
-            Save Task
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm text-white font-medium transition-colors disabled:opacity-50">
+            {saving ? 'Saving...' : 'Save Task'}
           </button>
         </div>
       </div>
@@ -201,27 +189,27 @@ function NewTaskModal({ onClose, onSave }: { onClose: () => void; onSave: (task:
   )
 }
 
-// ── Task Detail Modal ─────────────────────────────────────
-function TaskDetailModal({ task, onClose }: { task: KanbanTask; onClose: () => void }) {
+// Task detail modal
+function TaskDetailModal({ task, onClose }: { task: Task; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg bg-[#111118] border border-white/10 rounded-xl shadow-2xl p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white/80 mb-2 inline-block"
-              style={{ backgroundColor: task.tagColor + '33', border: `1px solid ${task.tagColor}44` }}
-            >
-              {task.tag}
-            </span>
+            {task.project_tag && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium mb-2 inline-block"
+                style={{ background: (task.tag_color || '#3b82f6') + '20', color: task.tag_color || '#3b82f6' }}>
+                {task.project_tag}
+              </span>
+            )}
             <h2 className="text-lg font-semibold text-white">{task.title}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white flex-shrink-0">
             <X size={16} />
           </button>
         </div>
-        <p className="text-sm text-gray-400 mb-4">{task.description}</p>
+        {task.description && <p className="text-sm text-gray-400 mb-4">{task.description}</p>}
         <div className="grid grid-cols-3 gap-3 text-sm">
           <div className="bg-white/5 rounded-lg p-3">
             <div className="text-xs text-gray-500 mb-1">Assignee</div>
@@ -232,14 +220,11 @@ function TaskDetailModal({ task, onClose }: { task: KanbanTask; onClose: () => v
             <div className="text-white font-medium capitalize">{task.status}</div>
           </div>
           <div className="bg-white/5 rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-1">Updated</div>
-            <div className="text-white font-medium">{task.timestamp}</div>
+            <div className="text-xs text-gray-500 mb-1">Created</div>
+            <div className="text-white font-medium">{new Date(task.created_at).toLocaleDateString()}</div>
           </div>
         </div>
         <div className="mt-4 flex gap-2">
-          <button onClick={() => { toast('Coming soon'); onClose() }} className="flex-1 py-2 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-sm text-teal-400 transition-colors">
-            Edit Task
-          </button>
           <button onClick={onClose} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-gray-400 transition-colors">
             Close
           </button>
@@ -249,131 +234,240 @@ function TaskDetailModal({ task, onClose }: { task: KanbanTask; onClose: () => v
   )
 }
 
-// ── Main Page ──────────────────────────────────────────────
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks)
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [activities, setActivities] = useState<ActivityEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<KanbanTask | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [filter, setFilter] = useState<string | null>(null)
 
-  const stats = [
-    { label: 'Completed today', value: 47, color: '#22c55e' },
-    { label: 'Agents active', value: '8/8', color: '#06b6d4' },
-    { label: 'Throughput/hr', value: 124, color: '#3b82f6' },
-    { label: 'Pipeline load', value: 6, color: '#f97316' },
-  ]
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  const filteredTasks = assigneeFilter
-    ? tasks.filter(t => t.assignee === assigneeFilter)
-    : tasks
+  useEffect(() => {
+    async function fetchData() {
+      const [{ data: taskData, error: taskError }, { data: activityData }] = await Promise.all([
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+        supabase.from('activity_events').select('*').order('created_at', { ascending: false }).limit(50),
+      ])
+      if (taskError) console.error('Tasks fetch error:', taskError)
+      if (taskData) setTasks(taskData)
+      if (activityData) setActivities(activityData)
+      setLoading(false)
+    }
+    fetchData()
 
-  function handleAddTask(task: KanbanTask) {
-    setTasks(prev => [...prev, task])
+    // Real-time subscriptions
+    const taskSub = supabase
+      .channel('tasks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+        if (payload.eventType === 'INSERT') setTasks(prev => [payload.new as Task, ...prev])
+        if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === (payload.new as Task).id ? payload.new as Task : t))
+        if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== (payload.old as Task).id))
+      })
+      .subscribe()
+
+    const activitySub = supabase
+      .channel('activity-realtime-tasks')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_events' }, (payload) => {
+        setActivities(prev => [payload.new as ActivityEvent, ...prev.slice(0, 49)])
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(taskSub)
+      supabase.removeChannel(activitySub)
+    }
+  }, [])
+
+  function handleDragStart(event: DragStartEvent) {
+    const found = tasks.find(t => t.id === event.active.id)
+    setActiveTask(found || null)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setActiveTask(null)
+    if (!over) return
+
+    const taskId = active.id as string
+    const newStatus = over.id as string
+
+    if (COLUMNS.some(c => c.key === newStatus)) {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task || task.status === newStatus) return
+
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as Task['status'] } : t))
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', taskId)
+      if (error) {
+        console.error('Update error:', error)
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: task.status } : t))
+        toast.error('Failed to update task status')
+      }
+    }
+  }
+
+  async function handleCreateTask(data: Partial<Task>) {
+    const newTask = {
+      title: data.title!,
+      description: data.description,
+      status: data.status || 'backlog',
+      assignee: data.assignee || 'Awais',
+      project_tag: data.project_tag,
+      created_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('tasks').insert(newTask)
+    if (error) {
+      console.error('Insert error:', error)
+      toast.error('Failed to create task')
+    } else {
+      toast.success('Task created!')
+    }
+  }
+
+  const filteredTasks = filter ? tasks.filter(t => t.assignee === filter) : tasks
+  const today = new Date().toISOString().split('T')[0]
+  const completedToday = tasks.filter(t => t.status === 'done' && t.completed_at?.startsWith(today)).length
+  const activeAgents = new Set(activities.slice(0, 20).map(a => a.agent_name)).size
+
+  // Get unique assignees for filter buttons
+  const assignees = [...new Set(tasks.map(t => t.assignee))].slice(0, 5)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-teal-400 animate-pulse">Loading tasks...</div>
+      </div>
+    )
   }
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0 p-6 overflow-y-auto">
-        {/* Stats Bar */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {stats.map(stat => (
-            <div key={stat.label} className="bg-[#111118] border border-white/10 rounded-lg p-4">
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-sm text-gray-400 mt-1">{stat.label}</div>
+      <div className="flex-1 flex flex-col min-w-0 p-6 overflow-hidden">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          {[
+            { label: 'Completed today', value: completedToday, color: '#22c55e' },
+            { label: 'Agents active', value: activeAgents, color: '#00d4aa' },
+            { label: 'In progress', value: tasks.filter(t => t.status === 'inprogress').length, color: '#3b82f6' },
+            { label: 'In review', value: tasks.filter(t => t.status === 'review').length, color: '#f97316' },
+          ].map(s => (
+            <div key={s.label} className="bg-[#111118] border border-white/10 rounded-lg p-3">
+              <div className="text-xl font-bold text-white">{s.value}</div>
+              <div className="text-xs text-gray-400">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Filter row */}
-        <div className="flex items-center gap-2 mb-5">
+        {/* Filters + New Task */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-sm text-white font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-sm font-medium transition-colors"
           >
             <Plus size={14} />
             New Task
           </button>
-          {['Alex', 'Henry'].map(name => (
+          <button
+            onClick={() => setFilter(null)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${!filter ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30' : 'text-gray-400 hover:text-white bg-white/5'}`}
+          >
+            All
+          </button>
+          {assignees.map(a => (
             <button
-              key={name}
-              onClick={() => setAssigneeFilter(assigneeFilter === name ? null : name)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                assigneeFilter === name
-                  ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-              }`}
+              key={a}
+              onClick={() => setFilter(filter === a ? null : a)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === a ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30' : 'text-gray-400 hover:text-white bg-white/5'}`}
             >
-              {name}
+              {a}
             </button>
           ))}
-          <button
-            onClick={() => setAssigneeFilter(null)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              !assigneeFilter
-                ? 'bg-teal-600/20 text-teal-400 border border-teal-500/30'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            All projects
-          </button>
         </div>
 
-        {/* Kanban Board */}
-        <div className="flex gap-4 overflow-x-auto pb-4 flex-1">
-          {COLUMNS.map(col => {
-            const colTasks = filteredTasks.filter(t => t.status === col.key)
-            return (
-              <div key={col.key} className="flex-shrink-0 w-64">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
-                  <span className="text-sm font-medium text-gray-300">{col.label}</span>
-                  <span className="ml-auto text-xs text-gray-500 bg-white/5 px-1.5 py-0.5 rounded-full">
-                    {colTasks.length}
-                  </span>
+        {/* Kanban with DnD */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto flex-1 pb-4">
+            {COLUMNS.map(col => {
+              const colTasks = filteredTasks.filter(t => t.status === col.key)
+              return (
+                <div key={col.key} className="w-60 flex-shrink-0 flex flex-col">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full" style={{ background: col.color }} />
+                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">{col.label}</span>
+                    <span className="text-xs text-gray-600 ml-auto bg-white/5 px-1.5 py-0.5 rounded-full">{colTasks.length}</span>
+                  </div>
+                  <SortableContext items={colTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    <DroppableColumn id={col.key}>
+                      {colTasks.map(task => (
+                        <SortableTaskCard key={task.id} task={task} onClick={() => setSelectedTask(task)} />
+                      ))}
+                      {colTasks.length === 0 && (
+                        <div className="text-xs text-gray-600 text-center py-8 border border-dashed border-white/5 rounded-lg">
+                          {tasks.length === 0 && col.key === 'backlog'
+                            ? 'No tasks yet — agents will create tasks here automatically'
+                            : 'Drop here'}
+                        </div>
+                      )}
+                    </DroppableColumn>
+                  </SortableContext>
                 </div>
-                <div className="space-y-2">
-                  {colTasks.map(task => (
-                    <TaskCard key={task.id} task={task} onClick={() => setSelectedTask(task)} />
-                  ))}
-                  {colTasks.length === 0 && (
-                    <div className="text-center text-xs text-gray-600 py-6 border border-dashed border-white/5 rounded-lg">
-                      No tasks
-                    </div>
-                  )}
-                </div>
+              )
+            })}
+          </div>
+          <DragOverlay>
+            {activeTask && (
+              <div className="bg-[#1a1a24] border border-teal-500/50 rounded-lg p-3 shadow-xl shadow-black/50 rotate-1">
+                <p className="text-sm text-white">{activeTask.title}</p>
+                <p className="text-xs text-gray-400 mt-1">{activeTask.assignee}</p>
               </div>
-            )
-          })}
-        </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
 
-      {/* Right Panel: Live Activity Feed */}
+      {/* Live Activity Feed */}
       <div className="w-72 flex-shrink-0 border-l border-white/10 bg-[#0a0a0f] flex flex-col">
         <div className="p-4 border-b border-white/10">
-          <h3 className="text-sm font-semibold text-white">Live Activity</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+            Live Activity
+          </h3>
           <p className="text-xs text-gray-500 mt-0.5">Real-time agent actions</p>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {mockActivity.map((item, i) => (
-            <div key={i} className="p-2.5 rounded-lg bg-white/3 hover:bg-white/5 transition-colors">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-xs font-semibold" style={{ color: item.agentColor }}>{item.agent}</span>
-                <span className="ml-auto text-[10px] text-gray-600">{item.time}</span>
-              </div>
-              <p className="text-[11px] text-gray-400 leading-relaxed">{item.action}</p>
+          {activities.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-xs text-gray-600">No recent activity.</p>
+              <p className="text-xs text-gray-700 mt-1">Waiting for agents...</p>
             </div>
-          ))}
+          ) : (
+            activities.map(a => (
+              <div key={a.id} className="p-2.5 rounded-lg bg-white/3 hover:bg-white/5 transition-colors">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs font-semibold text-teal-400">{a.agent_name}</span>
+                  <span className="ml-auto text-[10px] text-gray-600">
+                    {new Date(a.created_at).toLocaleTimeString()}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 leading-relaxed">{a.action}</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Modals */}
-      {showNewModal && (
-        <NewTaskModal onClose={() => setShowNewModal(false)} onSave={handleAddTask} />
-      )}
-      {selectedTask && (
-        <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />
-      )}
+      {showNewModal && <NewTaskModal onClose={() => setShowNewModal(false)} onSave={handleCreateTask} />}
+      {selectedTask && <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
     </div>
   )
 }

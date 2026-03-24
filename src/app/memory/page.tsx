@@ -1,45 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import { Search, Brain, FileText, Calendar } from 'lucide-react'
 
 interface MemoryEntry {
   id: string
-  date: string
-  size: string
-  words: number
+  date?: string
+  title?: string
   content: string
+  size?: number
+  word_count?: number
+  created_at: string
+  agent_name?: string
+  entry_type?: string
 }
 
-const entries: MemoryEntry[] = [
-  {
-    id: '1',
-    date: 'Thu, Mar 20',
-    size: '3.3 KB',
-    words: 772,
-    content: '# Thursday, March 20\n\n## Qwen 3.5 Medium Research\n\nResearched new Qwen model release. Key findings: significant improvement in reasoning tasks, 70% of GPT-4o cost, strong multilingual support.\n\nBenchmarks vs competitors:\n- MMLU: 85.2 (Qwen) vs 83.1 (GPT-4o-mini)\n- HumanEval: 76% vs 71%\n- Cost: $0.14/M tokens vs $0.20/M tokens\n\n## Mission Control Planning\n\nDiscussed new page designs with Awais. Phase 2+3 scope finalized:\n- Content pipeline Kanban\n- Approvals workflow\n- Projects tracker\n- Team org chart\n- People CRM\n- Docs browser\n- Memory upgrade\n- Council (multi-model)\n\n## Agent Updates\n\nCharlie completed Railway deploy without intervention — first fully autonomous deployment. Scout flagged 3 trending topics for content pipeline.'
-  },
-  {
-    id: '2',
-    date: 'Wed, Mar 19',
-    size: '2.1 KB',
-    words: 498,
-    content: '# Wednesday, March 19\n\n## Agent Coordination Improvement\n\nImplemented better handoff protocol between Henry and Charlie. No more duplicate task assignments.\n\nKey change: Henry now writes explicit delegation notes in the task title, not just the body.\n\n## Supabase Integration\n\nStarted planning database schema for Mission Control:\n- agents table\n- tasks table\n- approvals table\n- content_items table\n- memory_entries table\n\n## Notes\n\n- OpenAI o3 benchmarks leaked — impressive on math but expensive\n- Consider switching Scout to Gemini Flash for cost savings'
-  },
-  {
-    id: '3',
-    date: 'Tue, Mar 18',
-    size: '4.7 KB',
-    words: 1102,
-    content: '# Tuesday, March 18\n\n## Architecture Discussion\n\nDecided to use file system as database for now. Simple, fast, no infra needed. Perfect is the enemy of done.\n\nDecision tree:\n- Current scale: file system ✓\n- 100+ daily entries: SQLite\n- Multi-agent concurrent writes: Supabase\n\n## Mission Control Phase 1 Launch\n\nLaunched to Railway. Initial pages:\n- Dashboard\n- Agents\n- Tasks\n- Memory (v1)\n- Activity\n- Costs\n\n## Awais Notes\n\n- Wants dark theme throughout, no light mode by default\n- Teal as primary accent color\n- Cards with subtle borders, not heavy shadows\n- "Like Linear but for AI agents"\n\n## Agent Performance Review\n\nScout: 9/10 — great trend signals this week\nQuill: 8/10 — newsletter draft needed 2 revisions\nCharlie: 10/10 — flawless infra week\nCodex: 7/10 — one failed PR, good recovery\nHenry: 9/10 — coordination improving'
-  },
-]
+function formatDate(entry: MemoryEntry) {
+  if (entry.date) return entry.date
+  return new Date(entry.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
 
-const groups = [
-  { label: 'This Week', ids: ['1', '2', '3'] },
-  { label: 'Last Week', ids: [] },
-  { label: 'February 2026', ids: [] },
-]
+function formatSize(bytes?: number) {
+  if (!bytes) return null
+  if (bytes < 1024) return `${bytes} B`
+  return `${(bytes / 1024).toFixed(1)} KB`
+}
 
 function renderContent(content: string) {
   return content.split('\n').map((line, i) => {
@@ -52,21 +38,85 @@ function renderContent(content: string) {
   })
 }
 
+// Group entries by time period
+function groupEntries(entries: MemoryEntry[]) {
+  const now = new Date()
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+
+  const groups: { label: string; entries: MemoryEntry[] }[] = [
+    { label: 'This Week', entries: [] },
+    { label: 'Last Week', entries: [] },
+    { label: 'Older', entries: [] },
+  ]
+
+  entries.forEach(entry => {
+    const date = new Date(entry.created_at)
+    if (date >= weekAgo) groups[0].entries.push(entry)
+    else if (date >= twoWeeksAgo) groups[1].entries.push(entry)
+    else groups[2].entries.push(entry)
+  })
+
+  return groups.filter(g => g.entries.length > 0)
+}
+
 export default function MemoryPage() {
-  const [selected, setSelected] = useState(entries[0].id)
+  const [entries, setEntries] = useState<MemoryEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  const selectedEntry = entries.find(e => e.id === selected)
+  useEffect(() => {
+    async function fetchData() {
+      const { data, error } = await supabase
+        .from('memory_entries')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) console.error('Memory fetch error:', error)
+      if (data) {
+        setEntries(data)
+        if (data.length > 0) setSelected(data[0].id)
+      }
+      setLoading(false)
+    }
+    fetchData()
+
+    const sub = supabase
+      .channel('memory-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'memory_entries' }, (payload) => {
+        setEntries(prev => [payload.new as MemoryEntry, ...prev])
+        setSelected(payload.new.id)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
 
   const filtered = entries.filter(e =>
-    !search || e.date.toLowerCase().includes(search.toLowerCase()) || e.content.toLowerCase().includes(search.toLowerCase())
+    !search ||
+    formatDate(e).toLowerCase().includes(search.toLowerCase()) ||
+    (e.title || '').toLowerCase().includes(search.toLowerCase()) ||
+    e.content.toLowerCase().includes(search.toLowerCase())
   )
+
+  const selectedEntry = entries.find(e => e.id === selected)
+  const groups = groupEntries(filtered)
+
+  const totalWords = entries.reduce((sum, e) => sum + (e.word_count || e.content.split(/\s+/).length), 0)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-teal-400 animate-pulse">Loading memory...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
       {/* Left Column */}
       <div className="w-72 flex flex-col border-r border-white/10" style={{ background: 'var(--bg-secondary)' }}>
-        {/* Long-term memory card */}
+        {/* Stats */}
         <div className="p-4 border-b border-white/10">
           <div className="flex items-center gap-2 mb-2">
             <Brain size={16} className="text-teal-400" />
@@ -74,11 +124,11 @@ export default function MemoryPage() {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg p-2 bg-white/5 text-center">
-              <p className="text-lg font-bold text-teal-400">47</p>
+              <p className="text-lg font-bold text-teal-400">{entries.length}</p>
               <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>journal entries</p>
             </div>
             <div className="rounded-lg p-2 bg-white/5 text-center">
-              <p className="text-lg font-bold text-purple-400">128K</p>
+              <p className="text-lg font-bold text-purple-400">{totalWords > 1000 ? `${(totalWords / 1000).toFixed(0)}K` : totalWords}</p>
               <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>total words</p>
             </div>
           </div>
@@ -100,19 +150,21 @@ export default function MemoryPage() {
 
         {/* Entry list */}
         <div className="flex-1 overflow-y-auto">
-          {groups.map(group => {
-            const groupEntries = filtered.filter(e => group.ids.includes(e.id))
-            if (groupEntries.length === 0 && group.ids.length > 0) return null
-            if (group.ids.length === 0) return (
-              <div key={group.label} className="px-3 py-2">
-                <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{group.label}</p>
-                <p className="text-xs px-2 py-1" style={{ color: 'var(--text-muted)' }}>No entries</p>
-              </div>
-            )
-            return (
+          {filtered.length === 0 ? (
+            <div className="p-4 text-center">
+              {entries.length === 0 ? (
+                <p className="text-xs text-gray-600">No memory entries yet.</p>
+              ) : (
+                <p className="text-xs text-gray-600">No results for &quot;{search}&quot;</p>
+              )}
+            </div>
+          ) : (
+            groups.map(group => (
               <div key={group.label} className="mb-2">
-                <p className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2" style={{ color: 'var(--text-muted)' }}>{group.label}</p>
-                {groupEntries.map(entry => (
+                <p className="text-[10px] uppercase tracking-widest font-semibold px-3 py-2" style={{ color: 'var(--text-muted)' }}>
+                  {group.label}
+                </p>
+                {group.entries.map(entry => (
                   <button
                     key={entry.id}
                     onClick={() => setSelected(entry.id)}
@@ -124,30 +176,41 @@ export default function MemoryPage() {
                   >
                     <Calendar size={13} className={selected === entry.id ? 'text-teal-400' : 'text-white/30'} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${selected === entry.id ? 'text-teal-300' : 'text-white'}`}>
-                        {entry.date}
+                      <p className={`text-sm font-medium truncate ${selected === entry.id ? 'text-teal-300' : 'text-white'}`}>
+                        {entry.title || formatDate(entry)}
                       </p>
                       <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {entry.size} · {entry.words.toLocaleString()} words
+                        {formatSize(entry.size) && `${formatSize(entry.size)} · `}
+                        {(entry.word_count || entry.content.split(/\s+/).length).toLocaleString()} words
                       </p>
                     </div>
                   </button>
                 ))}
               </div>
-            )
-          })}
+            ))
+          )}
         </div>
       </div>
 
       {/* Right Column — Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {selectedEntry ? (
+        {entries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <Brain size={48} className="text-gray-700 mb-4" />
+            <p className="text-gray-400 text-sm">No memory entries yet.</p>
+            <p className="text-gray-600 text-xs mt-2">Agents will store journal entries and notes here automatically.</p>
+          </div>
+        ) : selectedEntry ? (
           <>
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
               <FileText size={16} className="text-teal-400" />
               <div>
-                <p className="text-sm font-medium text-white">{selectedEntry.date}</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{selectedEntry.size} · {selectedEntry.words.toLocaleString()} words</p>
+                <p className="text-sm font-medium text-white">{selectedEntry.title || formatDate(selectedEntry)}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {formatSize(selectedEntry.size) && `${formatSize(selectedEntry.size)} · `}
+                  {(selectedEntry.word_count || selectedEntry.content.split(/\s+/).length).toLocaleString()} words
+                  {selectedEntry.agent_name && ` · ${selectedEntry.agent_name}`}
+                </p>
               </div>
             </div>
             <div>{renderContent(selectedEntry.content)}</div>

@@ -5,8 +5,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Server-side client with service key
-export function createServiceClient() {
+export function getServiceClient() {
   const serviceKey = process.env.SUPABASE_SERVICE_KEY || ''
   return createClient(supabaseUrl, serviceKey)
 }
+
+// Legacy alias
+export { getServiceClient as createServiceClient }
