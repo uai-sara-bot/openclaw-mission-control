@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { Bell, CheckCheck, AlertTriangle, CheckCircle, Search } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Bell, CheckCheck, AlertTriangle, CheckCircle, Search, PauseCircle, Zap } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import toast, { Toaster } from 'react-hot-toast'
 

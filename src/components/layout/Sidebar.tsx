@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Activity,
   DollarSign, Calendar, Brain, Settings, Bell,
-  Zap, Shield, FolderOpen, Globe, Building2
+  Zap, Shield, FolderOpen, Globe, Building2,
+  Video, CheckSquare, MessageSquare, Folder, FileText, Users2, Network
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
