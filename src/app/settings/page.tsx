@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import {
   Settings, Globe, Bell, Database, Info,
   Trash2
@@ -263,7 +264,7 @@ export default function SettingsPage() {
                   <span className="text-xs text-[var(--text-secondary)] font-mono">247 MB / 500 MB</span>
                 </div>
                 <div className="border-t border-[var(--border)]" />
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
+                <button onClick={() => toast('Coming soon')} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
                   <Trash2 size={14} />
                   Purge Expired Data
                 </button>

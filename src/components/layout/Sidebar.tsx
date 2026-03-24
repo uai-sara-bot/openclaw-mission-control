@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Activity,
   DollarSign, Calendar, Brain, Settings, Bell,
-  Zap, Shield, FolderOpen, Globe
+  Zap, Shield, FolderOpen, Globe, Video, CheckSquare,
+  MessageSquare, Folder, FileText, Users2, Building2, Network
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,17 @@ const navigation = [
   { name: 'Notifications', href: '/notifications', icon: Bell },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Gateway', href: '/gateway', icon: Globe },
+]
+
+const extendedNavigation = [
+  { name: 'Content', href: '/content', icon: Video },
+  { name: 'Approvals', href: '/approvals', icon: CheckSquare },
+  { name: 'Council', href: '/council', icon: MessageSquare },
+  { name: 'Projects', href: '/projects', icon: Folder },
+  { name: 'Docs', href: '/docs', icon: FileText },
+  { name: 'People', href: '/people', icon: Users2 },
+  { name: 'Office', href: '/office', icon: Building2 },
+  { name: 'Team', href: '/team', icon: Network },
 ]
 
 export function Sidebar() {
@@ -64,6 +76,27 @@ export function Sidebar() {
             </Link>
           )
         })}
+        <div className="border-t border-white/5 my-2 pt-2">
+          <div className="px-3 py-1 text-[10px] text-gray-600 uppercase tracking-wider mb-1">More</div>
+          {extendedNavigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                  isActive
+                    ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
+                )}
+              >
+                <item.icon size={18} />
+                {item.name}
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       {/* Gateway Status */}
