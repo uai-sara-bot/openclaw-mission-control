@@ -6,6 +6,7 @@ import {
   Bot, Eye, Pencil, Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
 
 interface MemoryFile {
   id: string
@@ -183,13 +184,13 @@ export default function MemoryPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button aria-label="View file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
+                  <button onClick={() => toast('Coming soon')} aria-label="View file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
                     <Eye size={14} />
                   </button>
-                  <button aria-label="Edit file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
+                  <button onClick={() => toast('Coming soon')} aria-label="Edit file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5 transition-colors">
                     <Pencil size={14} />
                   </button>
-                  <button aria-label="Delete file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
+                  <button onClick={() => toast('Coming soon')} aria-label="Delete file" className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors">
                     <Trash2 size={14} />
                   </button>
                 </div>

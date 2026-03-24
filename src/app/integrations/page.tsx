@@ -6,6 +6,7 @@ import {
   Mic, Play, Search, Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
 
 interface Integration {
   id: string
@@ -125,7 +126,7 @@ export default function IntegrationsPage() {
                 ) : (
                   <span className="text-[10px] text-[var(--text-muted)]">Never synced</span>
                 )}
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5 hover:bg-white/10 transition-colors">
+                <button onClick={() => toast('Coming soon')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5 hover:bg-white/10 transition-colors">
                   <Settings size={12} />
                   Configure
                 </button>
