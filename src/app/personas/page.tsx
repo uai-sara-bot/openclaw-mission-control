@@ -1,109 +1,69 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Persona } from '@/types'
+import { useState, useEffect, useMemo } from 'react'
+import { Agent } from '@/types'
 import { Search, Circle, Bot } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
-const personas: Persona[] = [
-  {
-    id: '1', name: 'sara', displayName: 'Sara', avatar: '👩‍💼', role: 'Project Manager',
-    skills: ['Planning', 'Coordination', 'Reporting', 'Agile'],
-    description: 'Oversees project timelines, coordinates between agents, and ensures deliverables stay on track.',
-    status: 'active', currentTask: 'Sprint planning for v2.0 release',
-    agentId: '1', model: 'Claude Opus', channel: 'DM',
-  },
-  {
-    id: '2', name: 'atlas', displayName: 'Atlas', avatar: '🎨', role: 'Frontend Developer',
-    skills: ['React', 'TypeScript', 'Tailwind', 'Next.js'],
-    description: 'Builds and maintains the Mission Control UI, component library, and frontend architecture.',
-    status: 'active', currentTask: 'Building persona cards component',
-    agentId: '3', model: 'Claude Sonnet', channel: '#engage-dev',
-  },
-  {
-    id: '3', name: 'nova', displayName: 'Nova', avatar: '⚙️', role: 'Backend Developer',
-    skills: ['Node.js', 'PostgreSQL', 'Supabase', 'WebSocket'],
-    description: 'Designs APIs, manages database schemas, and handles real-time gateway connections.',
-    status: 'active', currentTask: 'Optimizing WebSocket message throughput',
-    agentId: '10', model: 'Claude Sonnet', channel: '#general-work',
-  },
-  {
-    id: '4', name: 'echo', displayName: 'Echo', avatar: '🧪', role: 'QA Engineer',
-    skills: ['Testing', 'Playwright', 'CI/CD', 'Bug Triage'],
-    description: 'Writes and runs automated tests, triages bugs, and validates releases before deployment.',
-    status: 'idle', currentTask: null,
-    agentId: '4', model: 'Claude Sonnet', channel: '#research',
-  },
-  {
-    id: '5', name: 'forge', displayName: 'Forge', avatar: '🔧', role: 'DevOps',
-    skills: ['Docker', 'Railway', 'GitHub Actions', 'Monitoring'],
-    description: 'Manages infrastructure, CI/CD pipelines, deployments, and system monitoring.',
-    status: 'idle', currentTask: null,
-    agentId: '10', model: 'Claude Sonnet', channel: '#general-work',
-  },
-  {
-    id: '6', name: 'scout', displayName: 'Scout', avatar: '🔍', role: 'Researcher',
-    skills: ['Analysis', 'Web Search', 'Summarization', 'Benchmarking'],
-    description: 'Conducts deep research on technologies, competitors, and best practices.',
-    status: 'active', currentTask: 'Researching agent orchestration frameworks',
-    agentId: '4', model: 'Claude Sonnet', channel: '#research',
-  },
-  {
-    id: '7', name: 'cipher', displayName: 'Cipher', avatar: '🛡️', role: 'Security Engineer',
-    skills: ['Auth', 'OWASP', 'Encryption', 'Audit'],
-    description: 'Reviews code for security vulnerabilities, manages auth flows, and conducts security audits.',
-    status: 'offline', currentTask: null,
-    agentId: '1', model: 'Claude Opus', channel: 'DM',
-  },
-  {
-    id: '8', name: 'sage', displayName: 'Sage', avatar: '📚', role: 'Technical Writer',
-    skills: ['Documentation', 'API Docs', 'Markdown', 'Tutorials'],
-    description: 'Writes and maintains technical documentation, API references, and onboarding guides.',
-    status: 'offline', currentTask: null,
-    agentId: '10', model: 'Claude Sonnet', channel: '#general-work',
-  },
-]
-
-const roles = ['All', ...Array.from(new Set(personas.map(p => p.role)))] as const
-const statusFilters = ['All', 'Active', 'Idle', 'Offline'] as const
-
-const statusConfig: Record<Persona['status'], { color: string; label: string }> = {
+const statusConfig: Record<string, { color: string; label: string }> = {
   active: { color: 'var(--accent-green)', label: 'Active' },
   idle: { color: 'var(--accent-orange)', label: 'Idle' },
   offline: { color: 'var(--text-muted)', label: 'Offline' },
+  error: { color: 'var(--accent-red)', label: 'Error' },
 }
 
+const statusFilters = ['All', 'Active', 'Idle', 'Offline'] as const
+
 export default function PersonasPage() {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('All')
-  const [roleFilter, setRoleFilter] = useState<string>('All')
+
+  useEffect(() => {
+    supabase.from('agents').select('*').order('name')
+      .then(({ data }) => {
+        if (data) setAgents(data)
+        setLoading(false)
+      })
+
+    const sub = supabase.channel('personas-agents-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, (payload) => {
+        if (payload.eventType === 'INSERT') setAgents(prev => [...prev, payload.new as Agent].sort((a, b) => a.name.localeCompare(b.name)))
+        if (payload.eventType === 'UPDATE') setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as Agent : a))
+        if (payload.eventType === 'DELETE') setAgents(prev => prev.filter(a => a.id !== (payload.old as Agent).id))
+      }).subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
 
   const filtered = useMemo(() => {
-    return personas.filter(p => {
+    return agents.filter(a => {
       const matchesSearch =
-        p.displayName.toLowerCase().includes(search.toLowerCase()) ||
-        p.role.toLowerCase().includes(search.toLowerCase()) ||
-        p.skills.some(s => s.toLowerCase().includes(search.toLowerCase()))
-      const matchesStatus = statusFilter === 'All' || p.status === statusFilter.toLowerCase()
-      const matchesRole = roleFilter === 'All' || p.role === roleFilter
-      return matchesSearch && matchesStatus && matchesRole
+        a.name.toLowerCase().includes(search.toLowerCase()) ||
+        a.role.toLowerCase().includes(search.toLowerCase()) ||
+        a.model.toLowerCase().includes(search.toLowerCase())
+      const matchesStatus = statusFilter === 'All' || a.status === statusFilter.toLowerCase()
+      return matchesSearch && matchesStatus
     })
-  }, [search, statusFilter, roleFilter])
+  }, [agents, search, statusFilter])
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-teal-400">Loading...</div>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Personas</h1>
-        <span className="text-sm text-[var(--text-muted)]">{filtered.length} of {personas.length} personas</span>
+        <span className="text-sm text-[var(--text-muted)]">{filtered.length} of {agents.length} agents</span>
       </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4">
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
-            placeholder="Search by name, role, or skill..."
+            placeholder="Search by name, role, or model..."
             aria-label="Search personas"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -111,7 +71,6 @@ export default function PersonasPage() {
           />
         </div>
 
-        {/* Status Filters */}
         <div className="flex gap-1 bg-[var(--bg-secondary)] rounded-lg p-1 border border-[var(--border)]">
           {statusFilters.map(f => (
             <button
@@ -127,83 +86,64 @@ export default function PersonasPage() {
             </button>
           ))}
         </div>
-
-        {/* Role Filter */}
-        <select
-          value={roleFilter}
-          onChange={e => setRoleFilter(e.target.value)}
-          aria-label="Filter by role"
-          className="px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-blue)] transition-colors"
-        >
-          {roles.map(r => (
-            <option key={r} value={r}>{r === 'All' ? 'All Roles' : r}</option>
-          ))}
-        </select>
       </div>
 
-      {/* Persona Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-        {filtered.map(persona => {
-          const sc = statusConfig[persona.status]
-          return (
-            <div
-              key={persona.id}
-              className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 hover:border-[var(--accent-blue)]/50 transition-colors"
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl" role="img" aria-label={persona.displayName}>{persona.avatar}</span>
-                  <div>
-                    <h3 className="font-semibold text-[var(--text-primary)]">{persona.displayName}</h3>
-                    <p className="text-sm text-[var(--accent-purple)]">{persona.role}</p>
+      {agents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <p className="text-lg mb-2">No agents configured</p>
+          <p className="text-sm">Add agents in OpenClaw config to see persona cards here.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+          {filtered.map(agent => {
+            const sc = statusConfig[agent.status] ?? statusConfig.offline
+            return (
+              <div
+                key={agent.id}
+                className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5 hover:border-[var(--accent-blue)]/50 transition-colors"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
+                      <span className="text-lg font-bold text-teal-300">{agent.name[0]}</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-[var(--text-primary)]">{agent.name}</h3>
+                      <p className="text-sm text-[var(--accent-purple)]">{agent.role}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Circle size={8} fill={sc.color} stroke={sc.color} />
+                    <span className="text-xs" style={{ color: sc.color }}>{sc.label}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Circle size={8} fill={sc.color} stroke={sc.color} />
-                  <span className="text-xs" style={{ color: sc.color }}>{sc.label}</span>
+
+                {/* Current Task */}
+                {(agent as Agent & { current_task?: string }).current_task && (
+                  <div className="mb-3 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)]">
+                    <p className="text-xs text-[var(--text-muted)] mb-0.5">Current Task</p>
+                    <p className="text-sm text-[var(--text-primary)] truncate">{(agent as Agent & { current_task?: string }).current_task}</p>
+                  </div>
+                )}
+
+                {/* Agent Link */}
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pt-2 border-t border-[var(--border)]">
+                  <Bot size={14} />
+                  <span className="font-mono">{agent.model}</span>
+                  <span>·</span>
+                  <span>{agent.channel}</span>
                 </div>
               </div>
-
-              {/* Description */}
-              <p className="text-sm text-[var(--text-secondary)] mb-3 line-clamp-2">{persona.description}</p>
-
-              {/* Skills */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {persona.skills.map(skill => (
-                  <span
-                    key={skill}
-                    className="px-2 py-0.5 text-xs rounded-full bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-
-              {/* Current Task */}
-              {persona.currentTask && (
-                <div className="mb-3 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)]">
-                  <p className="text-xs text-[var(--text-muted)] mb-0.5">Current Task</p>
-                  <p className="text-sm text-[var(--text-primary)] truncate">{persona.currentTask}</p>
-                </div>
-              )}
-
-              {/* Agent Link */}
-              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] pt-2 border-t border-[var(--border)]">
-                <Bot size={14} />
-                <span className="font-mono">{persona.model}</span>
-                <span>·</span>
-                <span>{persona.channel}</span>
-              </div>
+            )
+          })}
+          {filtered.length === 0 && agents.length > 0 && (
+            <div className="col-span-full py-12 text-center text-[var(--text-muted)]">
+              No agents match your filters.
             </div>
-          )
-        })}
-        {filtered.length === 0 && (
-          <div className="col-span-full py-12 text-center text-[var(--text-muted)]">
-            No personas match your filters.
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

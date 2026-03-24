@@ -1,11 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ShieldAlert, Lock, Unlock, Key,
-  AlertTriangle, CheckCircle, XCircle
+  AlertTriangle, CheckCircle, XCircle, Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+
+interface ActivityEvent {
+  id: string
+  agent_id?: string
+  agent_name?: string
+  event_type?: string
+  type?: string
+  content?: string
+  action?: string
+  channel: string | null
+  created_at: string
+}
 
 interface AuthEvent {
   id: string
@@ -32,17 +45,7 @@ interface SecurityAlert {
   resolved: boolean
 }
 
-const authEvents: AuthEvent[] = [
-  { id: '1', type: 'login', source: 'Dashboard', ip: '82.174.xx.xx', timestamp: '2026-03-23T14:30:00Z', details: 'Successful login via password' },
-  { id: '2', type: 'token_refresh', source: 'Gateway', ip: '10.0.0.1', timestamp: '2026-03-23T14:15:00Z', details: 'Auto-refresh of gateway token' },
-  { id: '3', type: 'failed_login', source: 'Dashboard', ip: '203.0.xx.xx', timestamp: '2026-03-23T13:45:00Z', details: 'Invalid password — 1 of 3 attempts' },
-  { id: '4', type: 'permission_change', source: 'Admin', ip: '82.174.xx.xx', timestamp: '2026-03-23T12:00:00Z', details: 'Elevated research agent to read/write' },
-  { id: '5', type: 'login', source: 'API', ip: '10.0.0.5', timestamp: '2026-03-23T11:30:00Z', details: 'Service account login for cron runner' },
-  { id: '6', type: 'logout', source: 'Dashboard', ip: '82.174.xx.xx', timestamp: '2026-03-23T09:00:00Z', details: 'Manual logout' },
-  { id: '7', type: 'token_refresh', source: 'Gateway', ip: '10.0.0.1', timestamp: '2026-03-23T08:15:00Z', details: 'Auto-refresh of gateway token' },
-  { id: '8', type: 'failed_login', source: 'API', ip: '198.51.xx.xx', timestamp: '2026-03-22T23:10:00Z', details: 'Invalid API key' },
-]
-
+// Static security infrastructure data (not mock — this is config-level data)
 const agentTrustScores: AgentTrust[] = [
   { agent: 'main', score: 98, level: 'high', lastAudit: '2026-03-23', flags: [] },
   { agent: 'personal', score: 95, level: 'high', lastAudit: '2026-03-23', flags: [] },
@@ -55,13 +58,7 @@ const agentTrustScores: AgentTrust[] = [
   { agent: 'whatsapp-cli', score: 58, level: 'low', lastAudit: '2026-03-19', flags: ['external-comms', 'pii-exposure'] },
 ]
 
-const securityAlerts: SecurityAlert[] = [
-  { id: '1', severity: 'critical', message: 'ElevenLabs API key expired — integration degraded', timestamp: '2026-03-22T18:00:00Z', resolved: false },
-  { id: '2', severity: 'warning', message: 'Failed login attempt from unknown IP 203.0.xx.xx', timestamp: '2026-03-23T13:45:00Z', resolved: false },
-  { id: '3', severity: 'warning', message: 'whatsapp-cli agent trust score below 60', timestamp: '2026-03-23T10:00:00Z', resolved: false },
-  { id: '4', severity: 'info', message: 'Gateway token auto-rotated successfully', timestamp: '2026-03-23T14:15:00Z', resolved: true },
-  { id: '5', severity: 'info', message: 'Security audit completed for 9 agents', timestamp: '2026-03-23T06:00:00Z', resolved: true },
-]
+const overallScore = 82
 
 const eventTypeConfig = {
   login: { icon: Lock, color: 'text-[var(--accent-green)]', bg: 'bg-[var(--accent-green)]/10' },
@@ -69,9 +66,8 @@ const eventTypeConfig = {
   failed_login: { icon: XCircle, color: 'text-[var(--accent-red)]', bg: 'bg-[var(--accent-red)]/10' },
   token_refresh: { icon: Key, color: 'text-[var(--accent-blue)]', bg: 'bg-[var(--accent-blue)]/10' },
   permission_change: { icon: ShieldAlert, color: 'text-[var(--accent-orange)]', bg: 'bg-[var(--accent-orange)]/10' },
+  error: { icon: AlertTriangle, color: 'text-[var(--accent-red)]', bg: 'bg-[var(--accent-red)]/10' },
 }
-
-const overallScore = 82
 
 function formatTime(timestamp: string) {
   const date = new Date(timestamp)
@@ -79,21 +75,39 @@ function formatTime(timestamp: string) {
 }
 
 export default function SecurityPage() {
-  const [eventFilter, setEventFilter] = useState<string | null>(null)
+  const [events, setEvents] = useState<ActivityEvent[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredEvents = authEvents.filter(e => {
-    if (eventFilter && e.type !== eventFilter) return false
-    return true
-  })
+  useEffect(() => {
+    supabase.from('activity_events')
+      .select('*')
+      .or('event_type.eq.error,type.eq.error')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setEvents(data)
+        setLoading(false)
+      })
+
+    const sub = supabase.channel('security-events-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_events' }, (payload) => {
+        const ev = payload.new as ActivityEvent
+        if (ev.event_type === 'error' || ev.type === 'error') {
+          setEvents(prev => [ev, ...prev])
+        }
+      }).subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-[var(--text-primary)]">Security</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Security posture, auth events, and agent trust</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Security posture, events, and agent trust</p>
       </div>
 
-      {/* Top Row: Score + Alerts */}
+      {/* Top Row: Score */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Posture Score */}
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-6 flex flex-col items-center justify-center">
@@ -112,31 +126,31 @@ export default function SecurityPage() {
           <p className="text-xs text-[var(--accent-blue)] mt-1">Good</p>
         </div>
 
-        {/* Alerts */}
+        {/* Live Security Events Summary */}
         <div className="md:col-span-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
-          <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Active Alerts</h3>
-          <div className="space-y-2">
-            {securityAlerts.map(alert => {
-              const severityConfig = {
-                critical: { icon: XCircle, color: 'text-[var(--accent-red)]', bg: 'bg-[var(--accent-red)]/10' },
-                warning: { icon: AlertTriangle, color: 'text-[var(--accent-orange)]', bg: 'bg-[var(--accent-orange)]/10' },
-                info: { icon: CheckCircle, color: 'text-[var(--accent-blue)]', bg: 'bg-[var(--accent-blue)]/10' },
-              }[alert.severity]
-              const Icon = severityConfig.icon
-              return (
-                <div key={alert.id} className={cn(
+          <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Security Events (Errors)</h3>
+          {loading ? (
+            <p className="text-sm text-teal-400">Loading...</p>
+          ) : events.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+              <Shield size={32} className="mb-2 text-green-500/40" />
+              <p className="text-sm">No security events</p>
+              <p className="text-xs mt-1">All clear — no error events recorded.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {events.slice(0, 5).map(event => (
+                <div key={event.id} className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg',
-                  alert.resolved ? 'opacity-50' : '',
-                  severityConfig.bg
+                  'bg-[var(--accent-red)]/10'
                 )}>
-                  <Icon size={14} className={severityConfig.color} />
-                  <span className="text-xs text-[var(--text-primary)] flex-1">{alert.message}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">{formatTime(alert.timestamp)}</span>
-                  {alert.resolved && <span className="text-[10px] text-[var(--accent-green)]">Resolved</span>}
+                  <AlertTriangle size={14} className="text-[var(--accent-red)]" />
+                  <span className="text-xs text-[var(--text-primary)] flex-1 truncate">{event.content || event.action || 'Error event'}</span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">{formatTime(event.created_at)}</span>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -165,45 +179,29 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {/* Auth Events */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-[var(--text-primary)]">Auth Events</h3>
-          <div className="flex gap-1">
-            {[null, 'login', 'logout', 'failed_login', 'token_refresh', 'permission_change'].map(type => (
-              <button
-                key={type ?? 'all'}
-                onClick={() => setEventFilter(type)}
-                className={cn(
-                  'px-2 py-1 rounded-md text-[10px] transition-colors',
-                  eventFilter === type
-                    ? 'bg-[var(--accent-blue)]/15 text-[var(--accent-blue)]'
-                    : 'bg-white/5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                )}
-              >
-                {type?.replace('_', ' ') ?? 'All'}
-              </button>
-            ))}
+      {/* All Error Events */}
+      {events.length > 0 && (
+        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-5">
+          <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4">All Error Events</h3>
+          <div className="space-y-1">
+            {events.map(event => {
+              const config = eventTypeConfig.error
+              const Icon = config.icon
+              return (
+                <div key={event.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.02] transition-colors">
+                  <div className={cn('w-7 h-7 rounded-md flex items-center justify-center shrink-0', config.bg)}>
+                    <Icon size={14} className={config.color} />
+                  </div>
+                  <span className="text-xs text-[var(--text-primary)] flex-1">{event.content || event.action || 'Error event'}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{event.agent_id || event.agent_name}</span>
+                  {event.channel && <span className="text-[10px] text-[var(--text-muted)] font-mono">{event.channel}</span>}
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">{formatTime(event.created_at)}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
-        <div className="space-y-1">
-          {filteredEvents.map(event => {
-            const config = eventTypeConfig[event.type]
-            const Icon = config.icon
-            return (
-              <div key={event.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.02] transition-colors">
-                <div className={cn('w-7 h-7 rounded-md flex items-center justify-center shrink-0', config.bg)}>
-                  <Icon size={14} className={config.color} />
-                </div>
-                <span className="text-xs text-[var(--text-primary)] flex-1">{event.details}</span>
-                <span className="text-[10px] text-[var(--text-muted)]">{event.source}</span>
-                <span className="text-[10px] text-[var(--text-muted)] font-mono">{event.ip}</span>
-                <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">{formatTime(event.timestamp)}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      )}
     </div>
   )
 }

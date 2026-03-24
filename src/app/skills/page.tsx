@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Shield, Eye, Search as SearchIcon, Bug, CheckCircle, AlertTriangle,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Zap, Github, Cloud, Code, Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,92 +14,39 @@ interface Skill {
   description: string
   status: 'active' | 'inactive' | 'error'
   lastRun: string | null
-  author: string
+  source: string
   capabilities: string[]
-  icon: React.ElementType
-  color: string
+  enabled: boolean
 }
 
-interface ScanResult {
-  id: string
-  skill: string
-  check: string
-  status: 'pass' | 'fail' | 'warning'
-  message: string
+const ICON_MAP: Record<string, React.ElementType> = {
+  'clawsec-suite': Shield,
+  'soul-guardian': Eye,
+  'openclaw-audit-watchdog': Bug,
+  'searxng-local': SearchIcon,
+  'acp-router': Zap,
+  'one-drive': Cloud,
+  'coding-agent': Code,
+  'github': Github,
+  'weather': Globe,
 }
 
-const skills: Skill[] = [
-  {
-    id: 'clawsec-suite',
-    name: 'ClawSec Suite',
-    version: '2.1.0',
-    description: 'Comprehensive security toolkit for agent communication auditing, token rotation, and access control enforcement.',
-    status: 'active',
-    lastRun: '2026-03-23T14:00:00Z',
-    author: 'OpenClaw Core',
-    capabilities: ['token-rotation', 'access-audit', 'encryption-check', 'comm-monitoring'],
-    icon: Shield,
-    color: 'var(--accent-blue)',
-  },
-  {
-    id: 'soul-guardian',
-    name: 'Soul Guardian',
-    version: '1.4.2',
-    description: 'Behavioral guardrails and alignment monitoring. Ensures agents stay within defined operational boundaries.',
-    status: 'active',
-    lastRun: '2026-03-23T13:30:00Z',
-    author: 'OpenClaw Core',
-    capabilities: ['behavior-monitoring', 'boundary-enforcement', 'drift-detection', 'alert-escalation'],
-    icon: Eye,
-    color: 'var(--accent-purple)',
-  },
-  {
-    id: 'openclaw-audit-watchdog',
-    name: 'OpenClaw Audit Watchdog',
-    version: '1.2.0',
-    description: 'Continuous audit trail generation and compliance reporting for all agent actions and data access.',
-    status: 'active',
-    lastRun: '2026-03-23T06:00:00Z',
-    author: 'OpenClaw Core',
-    capabilities: ['audit-logging', 'compliance-report', 'data-access-tracking', 'anomaly-detection'],
-    icon: Bug,
-    color: 'var(--accent-orange)',
-  },
-  {
-    id: 'searxng-local',
-    name: 'SearXNG Local',
-    version: '3.0.1',
-    description: 'Privacy-preserving metasearch engine for agent web research. Routes through local SearXNG instance.',
-    status: 'inactive',
-    lastRun: '2026-03-22T16:45:00Z',
-    author: 'Community',
-    capabilities: ['web-search', 'privacy-routing', 'result-filtering', 'cache-management'],
-    icon: SearchIcon,
-    color: 'var(--accent-green)',
-  },
-]
-
-const scanResults: ScanResult[] = [
-  { id: '1', skill: 'clawsec-suite', check: 'Token Expiry', status: 'pass', message: 'All tokens valid and within rotation window' },
-  { id: '2', skill: 'clawsec-suite', check: 'Access Control', status: 'pass', message: 'All agents within authorized permission scopes' },
-  { id: '3', skill: 'clawsec-suite', check: 'Encryption', status: 'warning', message: 'ElevenLabs integration using expired credentials' },
-  { id: '4', skill: 'soul-guardian', check: 'Behavioral Bounds', status: 'pass', message: 'No boundary violations detected in last 24h' },
-  { id: '5', skill: 'soul-guardian', check: 'Alignment Drift', status: 'pass', message: 'All agents within acceptable drift thresholds' },
-  { id: '6', skill: 'openclaw-audit-watchdog', check: 'Audit Completeness', status: 'pass', message: '100% of agent actions logged in last 24h' },
-  { id: '7', skill: 'openclaw-audit-watchdog', check: 'PII Exposure', status: 'warning', message: 'whatsapp-cli agent handled 3 PII-containing messages' },
-  { id: '8', skill: 'searxng-local', check: 'Service Health', status: 'fail', message: 'SearXNG instance not responding — service may be down' },
-]
+const COLOR_MAP: Record<string, string> = {
+  'clawsec-suite': 'var(--accent-blue)',
+  'soul-guardian': 'var(--accent-purple)',
+  'openclaw-audit-watchdog': 'var(--accent-orange)',
+  'searxng-local': 'var(--accent-green)',
+  'acp-router': 'var(--accent-blue)',
+  'one-drive': 'var(--accent-blue)',
+  'coding-agent': 'var(--accent-green)',
+  'github': 'var(--text-secondary)',
+  'weather': 'var(--accent-blue)',
+}
 
 const statusConfig = {
   active: { label: 'Active', color: 'text-[var(--accent-green)]', bg: 'bg-[var(--accent-green)]/10', dot: 'bg-[var(--accent-green)]' },
   inactive: { label: 'Inactive', color: 'text-[var(--text-muted)]', bg: 'bg-white/5', dot: 'bg-[var(--text-muted)]' },
   error: { label: 'Error', color: 'text-[var(--accent-red)]', bg: 'bg-[var(--accent-red)]/10', dot: 'bg-[var(--accent-red)]' },
-}
-
-const checkStatusConfig = {
-  pass: { icon: CheckCircle, color: 'text-[var(--accent-green)]' },
-  fail: { icon: AlertTriangle, color: 'text-[var(--accent-red)]' },
-  warning: { icon: AlertTriangle, color: 'text-[var(--accent-orange)]' },
 }
 
 function formatTime(timestamp: string) {
@@ -108,39 +55,53 @@ function formatTime(timestamp: string) {
 }
 
 export default function SkillsPage() {
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [loading, setLoading] = useState(true)
   const [expandedSkill, setExpandedSkill] = useState<string | null>('clawsec-suite')
 
-  const passCount = scanResults.filter(r => r.status === 'pass').length
-  const warnCount = scanResults.filter(r => r.status === 'warning').length
-  const failCount = scanResults.filter(r => r.status === 'fail').length
+  useEffect(() => {
+    fetch('/api/openclaw/skills')
+      .then(r => r.json())
+      .then((data: Skill[]) => {
+        setSkills(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-teal-400">Loading...</div>
+
+  const activeCount = skills.filter(s => s.status === 'active').length
+  const inactiveCount = skills.filter(s => s.status === 'inactive').length
+  const errorCount = skills.filter(s => s.status === 'error').length
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">Skills</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Installed skill modules and security scans</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Installed skill modules for this OpenClaw instance</p>
         </div>
       </div>
 
-      {/* Scan Summary */}
+      {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[var(--accent-green)]/10 flex items-center justify-center">
             <CheckCircle size={18} className="text-[var(--accent-green)]" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-[var(--text-primary)]">{passCount}</p>
-            <p className="text-xs text-[var(--text-muted)]">Checks Passed</p>
+            <p className="text-lg font-semibold text-[var(--text-primary)]">{activeCount}</p>
+            <p className="text-xs text-[var(--text-muted)]">Active Skills</p>
           </div>
         </div>
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[var(--accent-orange)]/10 flex items-center justify-center">
-            <AlertTriangle size={18} className="text-[var(--accent-orange)]" />
+          <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center">
+            <AlertTriangle size={18} className="text-[var(--text-muted)]" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-[var(--text-primary)]">{warnCount}</p>
-            <p className="text-xs text-[var(--text-muted)]">Warnings</p>
+            <p className="text-lg font-semibold text-[var(--text-primary)]">{inactiveCount}</p>
+            <p className="text-xs text-[var(--text-muted)]">Inactive</p>
           </div>
         </div>
         <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
@@ -148,8 +109,8 @@ export default function SkillsPage() {
             <AlertTriangle size={18} className="text-[var(--accent-red)]" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-[var(--text-primary)]">{failCount}</p>
-            <p className="text-xs text-[var(--text-muted)]">Failures</p>
+            <p className="text-lg font-semibold text-[var(--text-primary)]">{errorCount}</p>
+            <p className="text-xs text-[var(--text-muted)]">Errors</p>
           </div>
         </div>
       </div>
@@ -157,10 +118,10 @@ export default function SkillsPage() {
       {/* Skills List */}
       <div className="space-y-3">
         {skills.map(skill => {
-          const status = statusConfig[skill.status]
-          const Icon = skill.icon
+          const status = statusConfig[skill.status] ?? statusConfig.inactive
+          const Icon = ICON_MAP[skill.id] ?? Shield
+          const color = COLOR_MAP[skill.id] ?? 'var(--accent-blue)'
           const isExpanded = expandedSkill === skill.id
-          const skillScans = scanResults.filter(r => r.skill === skill.id)
 
           return (
             <div key={skill.id} className="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] overflow-hidden">
@@ -170,9 +131,9 @@ export default function SkillsPage() {
               >
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `color-mix(in srgb, ${skill.color} 15%, transparent)` }}
+                  style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}
                 >
-                  <Icon size={20} style={{ color: skill.color }} />
+                  <Icon size={20} style={{ color }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -182,6 +143,7 @@ export default function SkillsPage() {
                       <div className={cn('w-1.5 h-1.5 rounded-full', status.dot)} />
                       {status.label}
                     </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--text-muted)]">{skill.source}</span>
                   </div>
                   <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{skill.description}</p>
                 </div>
@@ -196,35 +158,19 @@ export default function SkillsPage() {
               {isExpanded && (
                 <div className="px-5 pb-5 space-y-4">
                   <div className="border-t border-[var(--border)] pt-4" />
-
-                  <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
-                    <span>Author: <span className="text-[var(--text-secondary)]">{skill.author}</span></span>
+                  <div className="flex items-start gap-4 text-xs text-[var(--text-muted)]">
+                    <span>Source: <span className="text-[var(--text-secondary)]">{skill.source}</span></span>
                     <span>·</span>
-                    <span>Capabilities:</span>
-                    <div className="flex gap-1">
-                      {skill.capabilities.map(cap => (
-                        <span key={cap} className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-[var(--text-secondary)]">{cap}</span>
-                      ))}
-                    </div>
+                    <span className="flex-1">
+                      Capabilities:
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {skill.capabilities.map(cap => (
+                          <span key={cap} className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-[var(--text-secondary)]">{cap}</span>
+                        ))}
+                      </div>
+                    </span>
                   </div>
-
-                  {/* Scan Results */}
-                  {skillScans.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-[var(--text-secondary)]">Latest Scan Results</p>
-                      {skillScans.map(result => {
-                        const checkConfig = checkStatusConfig[result.status]
-                        const CheckIcon = checkConfig.icon
-                        return (
-                          <div key={result.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--bg-secondary)]">
-                            <CheckIcon size={14} className={checkConfig.color} />
-                            <span className="text-xs text-[var(--text-primary)] w-36 shrink-0">{result.check}</span>
-                            <span className="text-xs text-[var(--text-secondary)] flex-1">{result.message}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                  <p className="text-sm text-[var(--text-secondary)]">{skill.description}</p>
                 </div>
               )}
             </div>

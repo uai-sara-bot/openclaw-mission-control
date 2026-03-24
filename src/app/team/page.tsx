@@ -1,64 +1,81 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Pause, Zap, RefreshCw, Server } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { Agent } from '@/types'
 
-interface Agent {
-  id: string
-  name: string
-  role: string
-  model: string
-  tags: string[]
-  machine: string
-  gradient: string
-}
-
-const agents: Agent[] = [
-  { id: 'henry', name: 'Henry', role: 'Chief of Staff', model: 'claude-sonnet-4', tags: ['orchestration', 'planning', 'strategy'], machine: 'Machine 1', gradient: 'from-teal-500/20 to-cyan-500/20 border-teal-500/40' },
-  { id: 'charlie', name: 'Charlie', role: 'Infrastructure Lead', model: 'claude-sonnet-4', tags: ['infra', 'devops', 'systems'], machine: 'Machine 1', gradient: 'from-blue-500/20 to-indigo-500/20 border-blue-500/40' },
-  { id: 'ralph', name: 'Ralph', role: 'QA Foreman', model: 'claude-sonnet-4', tags: ['testing', 'QA', 'oversight'], machine: 'Machine 2', gradient: 'from-orange-500/20 to-amber-500/20 border-orange-500/40' },
-  { id: 'scout', name: 'Scout', role: 'Trend Analyst', model: 'gpt-4o', tags: ['research', 'trends', 'signals'], machine: 'Machine 2', gradient: 'from-green-500/20 to-emerald-500/20 border-green-500/40' },
-  { id: 'echo', name: 'Echo', role: 'Social Media', model: 'gpt-4o', tags: ['twitter', 'linkedin', 'social'], machine: 'Machine 2', gradient: 'from-pink-500/20 to-rose-500/20 border-pink-500/40' },
-  { id: 'quill', name: 'Quill', role: 'Content Writer', model: 'claude-sonnet-4', tags: ['writing', 'newsletter', 'copy'], machine: 'Machine 1', gradient: 'from-purple-500/20 to-violet-500/20 border-purple-500/40' },
-  { id: 'pixel', name: 'Pixel', role: 'Thumbnail Designer', model: 'dall-e-3', tags: ['design', 'thumbnails', 'visual'], machine: 'Machine 3', gradient: 'from-yellow-500/20 to-lime-500/20 border-yellow-500/40' },
-  { id: 'codex', name: 'Codex', role: 'Lead Engineer', model: 'claude-sonnet-4', tags: ['coding', 'PRs', 'engineering'], machine: 'Machine 3', gradient: 'from-cyan-500/20 to-sky-500/20 border-cyan-500/40' },
+const GRADIENTS = [
+  'from-teal-500/20 to-cyan-500/20 border-teal-500/40',
+  'from-blue-500/20 to-indigo-500/20 border-blue-500/40',
+  'from-orange-500/20 to-amber-500/20 border-orange-500/40',
+  'from-green-500/20 to-emerald-500/20 border-green-500/40',
+  'from-pink-500/20 to-rose-500/20 border-pink-500/40',
+  'from-purple-500/20 to-violet-500/20 border-purple-500/40',
+  'from-yellow-500/20 to-lime-500/20 border-yellow-500/40',
+  'from-cyan-500/20 to-sky-500/20 border-cyan-500/40',
 ]
 
-function AgentCard({ agent }: { agent: Agent }) {
+function hashGradient(id: string) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffffffff
+  return GRADIENTS[Math.abs(h) % GRADIENTS.length]
+}
+
+function AgentCard({ agent, gradient }: { agent: Agent; gradient: string }) {
   return (
-    <div className={`rounded-xl p-4 border bg-gradient-to-br ${agent.gradient}`} style={{ minWidth: '180px' }}>
+    <div className={`rounded-xl p-4 border bg-gradient-to-br ${gradient}`} style={{ minWidth: '180px' }}>
       <div className="flex items-start justify-between mb-3">
         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
           <span className="text-base font-bold text-white">{agent.name[0]}</span>
         </div>
-        <div className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-black/20 text-white/50">
-          <Server size={9} />
-          <span>{agent.machine}</span>
+        <div className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full ${
+          agent.status === 'active' ? 'bg-green-500/20 text-green-300' :
+          agent.status === 'idle' ? 'bg-yellow-500/20 text-yellow-300' :
+          'bg-white/10 text-white/50'
+        }`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${
+            agent.status === 'active' ? 'bg-green-400' :
+            agent.status === 'idle' ? 'bg-yellow-400' : 'bg-white/40'
+          }`} />
+          <span>{agent.status}</span>
         </div>
       </div>
       <h3 className="font-semibold text-white text-sm">{agent.name}</h3>
       <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>{agent.role}</p>
       <p className="text-xs mb-3 font-mono opacity-60 text-white">{agent.model}</p>
-      <div className="flex flex-wrap gap-1">
-        {agent.tags.map(tag => (
-          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">
-            {tag}
-          </span>
-        ))}
+      <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <Server size={10} />
+        <span>{agent.channel}</span>
       </div>
     </div>
   )
 }
 
 export default function TeamPage() {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
   const [pinged, setPinged] = useState(false)
   const [paused, setPaused] = useState(false)
 
-  const henry = agents.find(a => a.id === 'henry')!
-  const ops = agents.filter(a => ['charlie', 'ralph'].includes(a.id))
-  const input = agents.filter(a => ['scout', 'echo'].includes(a.id))
-  const output = agents.filter(a => ['quill', 'pixel'].includes(a.id))
-  const meta = agents.filter(a => ['codex'].includes(a.id))
+  useEffect(() => {
+    supabase.from('agents').select('*').order('name')
+      .then(({ data }) => {
+        if (data) setAgents(data)
+        setLoading(false)
+      })
+
+    const sub = supabase.channel('team-agents-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, (payload) => {
+        if (payload.eventType === 'INSERT') setAgents(prev => [...prev, payload.new as Agent].sort((a, b) => a.name.localeCompare(b.name)))
+        if (payload.eventType === 'UPDATE') setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as Agent : a))
+        if (payload.eventType === 'DELETE') setAgents(prev => prev.filter(a => a.id !== (payload.old as Agent).id))
+      }).subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-teal-400">Loading...</div>
 
   return (
     <div className="p-6 min-h-screen" style={{ background: 'var(--bg-primary)' }}>
@@ -66,7 +83,7 @@ export default function TeamPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Team</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Agent org chart</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Agent org chart · {agents.length} agents</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -101,56 +118,22 @@ export default function TeamPage() {
           &ldquo;An autonomous organization of AI agents that does work for me and produces value 24/7&rdquo;
         </p>
         <p className="text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-          9 AI agents across 3 machines, each with a real role and a real personality
+          {agents.length} AI agents, each with a real role and a real purpose
         </p>
       </div>
 
-      {/* Org Chart */}
-      <div className="space-y-8">
-        {/* Row 1 — Operations */}
-        <div>
-          <p className="text-xs uppercase tracking-widest font-semibold text-center mb-4" style={{ color: 'var(--text-muted)' }}>OPERATIONS</p>
-          <div className="flex justify-center">
-            <AgentCard agent={henry} />
-          </div>
+      {agents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+          <p className="text-lg mb-2">No agents configured</p>
+          <p className="text-sm">Add agents via the OpenClaw config to see them here.</p>
         </div>
-
-        {/* Connector */}
-        <div className="flex justify-center">
-          <div className="w-px h-6 bg-white/10" />
+      ) : (
+        <div className="flex flex-wrap gap-4 justify-center">
+          {agents.map(agent => (
+            <AgentCard key={agent.id} agent={agent} gradient={hashGradient(agent.id)} />
+          ))}
         </div>
-
-        {/* Row 2 — Ops team */}
-        <div>
-          <div className="flex justify-center gap-4">
-            {ops.map(a => <AgentCard key={a.id} agent={a} />)}
-          </div>
-        </div>
-
-        {/* Row 3 — Input + Output */}
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <p className="text-xs uppercase tracking-widest font-semibold text-center mb-4" style={{ color: 'var(--text-muted)' }}>INPUT SIGNALS</p>
-            <div className="flex justify-center gap-3">
-              {input.map(a => <AgentCard key={a.id} agent={a} />)}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest font-semibold text-center mb-4" style={{ color: 'var(--text-muted)' }}>OUTPUT ACTIONS</p>
-            <div className="flex justify-center gap-3">
-              {output.map(a => <AgentCard key={a.id} agent={a} />)}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 4 — Meta */}
-        <div>
-          <p className="text-xs uppercase tracking-widest font-semibold text-center mb-4" style={{ color: 'var(--text-muted)' }}>META LAYER</p>
-          <div className="flex justify-center">
-            {meta.map(a => <AgentCard key={a.id} agent={a} />)}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
