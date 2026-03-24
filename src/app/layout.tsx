@@ -4,6 +4,8 @@ import "./globals.css"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { TopBar } from "@/components/layout/TopBar"
 import { ThemeInitScript } from "@/components/layout/ThemeInitScript"
+import { StarfieldBackground } from "@/components/ui/StarfieldBackground"
+import { CommandPalette } from "@/components/ui/CommandPalette"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
@@ -23,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeInitScript />
       </head>
       <body className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`}>
-        <div className="flex min-h-screen">
+        <StarfieldBackground />
+        <CommandPalette />
+        <div className="flex min-h-screen page-content">
           <Sidebar />
           <main className="flex-1 ml-56">
             <TopBar />
