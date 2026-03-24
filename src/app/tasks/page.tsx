@@ -25,6 +25,8 @@ interface Task {
   created_at: string
   updated_at?: string
   completed_at?: string
+  started_at?: string
+  duration_ms?: number
   source?: string
 }
 
@@ -55,7 +57,20 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
       onClick={onClick}
       className="bg-[#1a1a24] border border-white/10 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-teal-500/30 transition-colors"
     >
-      <h4 className="text-sm text-white font-medium mb-1 line-clamp-2">{task.title}</h4>
+      <div className="flex items-start gap-2 mb-1">
+        {task.status === 'inprogress' && (() => {
+          const isRecent = task.started_at
+            ? (Date.now() - new Date(task.started_at).getTime()) < 30 * 60 * 1000
+            : false
+          return (
+            <div
+              className={`w-2 h-2 rounded-full shrink-0 mt-1 ${isRecent ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}
+              title={isRecent ? 'Active (started < 30m ago)' : 'In progress (started > 30m ago)'}
+            />
+          )
+        })()}
+        <h4 className="text-sm text-white font-medium line-clamp-2 flex-1">{task.title}</h4>
+      </div>
       {task.description && (
         <p className="text-xs text-gray-500 mb-2 line-clamp-1">{task.description}</p>
       )}
@@ -349,19 +364,32 @@ export default function TasksPage() {
     <div className="flex h-full overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 p-6 overflow-hidden">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
-          {[
+        {(() => {
+          const tasksWithDuration = tasks.filter(t => (t as Task & { duration_ms?: number }).duration_ms)
+          const avgMs = tasksWithDuration.length > 0
+            ? tasksWithDuration.reduce((sum, t) => sum + ((t as Task & { duration_ms?: number }).duration_ms || 0), 0) / tasksWithDuration.length
+            : null
+          const avgLabel = avgMs !== null
+            ? avgMs < 1000 ? `${Math.round(avgMs)}ms` : avgMs < 60000 ? `${(avgMs/1000).toFixed(1)}s` : `${(avgMs/60000).toFixed(1)}m`
+            : null
+          const statItems = [
             { label: 'Completed today', value: completedToday, color: '#22c55e' },
             { label: 'Agents active', value: activeAgents, color: '#00d4aa' },
             { label: 'In progress', value: tasks.filter(t => t.status === 'inprogress').length, color: '#3b82f6' },
             { label: 'In review', value: tasks.filter(t => t.status === 'review').length, color: '#f97316' },
-          ].map(s => (
-            <div key={s.label} className="bg-[#111118] border border-white/10 rounded-lg p-3">
-              <div className="text-xl font-bold text-white">{s.value}</div>
-              <div className="text-xs text-gray-400">{s.label}</div>
+            ...(avgLabel ? [{ label: 'Avg completion', value: avgLabel, color: '#a855f7' }] : []),
+          ]
+          return (
+            <div className={`grid gap-3 mb-4`} style={{ gridTemplateColumns: `repeat(${statItems.length}, 1fr)` }}>
+              {statItems.map(s => (
+                <div key={s.label} className="bg-[#111118] border border-white/10 rounded-lg p-3">
+                  <div className="text-xl font-bold text-white">{s.value}</div>
+                  <div className="text-xs text-gray-400">{s.label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )
+        })()}
 
         {/* Filters + New Task */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -371,6 +399,27 @@ export default function TasksPage() {
           >
             <Plus size={14} />
             New Task
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/openclaw/event', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'ping', message: 'Ping from Mission Control tasks page', target: 'main' }),
+                })
+                if (res.ok) {
+                  toast.success('Pinged Henry!')
+                } else {
+                  toast.error('Ping failed')
+                }
+              } catch {
+                toast.error('Ping failed')
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg text-sm transition-colors"
+          >
+            📡 Ping Henry
           </button>
           <button
             onClick={() => setFilter(null)}
