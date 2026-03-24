@@ -4,12 +4,6 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-)
 
 // Memory entries from the actual /data/.openclaw/memory/*.md files
 // These are seeded at build time from real files
@@ -38,6 +32,11 @@ const REAL_PROJECTS = [
 ]
 
 export async function POST() {
+  const { createClient } = await import('@supabase/supabase-js')
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_KEY || ''
+  )
   const results: Record<string, { success: boolean; count?: number; error?: string }> = {}
 
   // Seed memory entries
