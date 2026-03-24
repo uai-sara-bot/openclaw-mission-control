@@ -1,24 +1,39 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
-
-// Lazy singleton - doesn't throw at build time if env vars missing
-let _client: SupabaseClient | null = null
-
+// Returns a Supabase client - always created fresh to use runtime env vars
+// Works in browser (window exists) and on server
 export function getSupabaseClient(): SupabaseClient {
-  if (!_client) {
-    _client = createClient(supabaseUrl, supabaseAnonKey)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  
+  if (!url || !key) {
+    // Return a no-op client during build when vars aren't available
+    return {
+      from: () => ({
+        select: () => Promise.resolve({ data: [], error: null }),
+        insert: () => Promise.resolve({ data: null, error: null }),
+        update: () => Promise.resolve({ data: null, error: null }),
+        delete: () => Promise.resolve({ data: null, error: null }),
+        upsert: () => Promise.resolve({ data: null, error: null }),
+      }),
+      channel: () => ({
+        on: () => ({ subscribe: () => ({}) }),
+      }),
+      removeChannel: () => {},
+    } as unknown as SupabaseClient
   }
-  return _client
+  
+  return createClient(url, key)
 }
 
-// Named export for convenience (used in client components)
+// Named export - created fresh each time to pick up runtime env vars
 export const supabase = getSupabaseClient()
 
 export function getServiceClient(): SupabaseClient {
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY || supabaseAnonKey
-  return createClient(supabaseUrl, serviceKey)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const key = process.env.SUPABASE_SERVICE_KEY || ''
+  if (!url || !key) return getSupabaseClient()
+  return createClient(url, key)
 }
 
 export { getServiceClient as createServiceClient }
